@@ -1,59 +1,75 @@
-repeat task.wait() until game:IsLoaded()
-repeat task.wait() until game:GetService("Players").LocalPlayer
-repeat task.wait() until game:GetService("Players").LocalPlayer.Character
-
---// AUTO RACE V2/V3 - CLEAN TEXT UI
---// Hỗ trợ: Rabbit/Mink V3 = chest, Angel V3 = cần kill player race Angel rồi script tự check/submit
---// Flow: làm V2/V3 cho race hiện tại trước, xong V3 mới reroll race tiếp theo trong RACE_QUEUE
-
-getgenv().AUTO_RACE_V3 = true
+--// STOP OLD SCRIPT + CLEAN UI
+getgenv().AUTO_MINK = false
+getgenv().AUTO_RACE_V3 = false
+task.wait(0.5)
 
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local plr = Players.LocalPlayer
+
+local function clearOldGui(parent)
+    for _, v in ipairs(parent:GetChildren()) do
+        if v.Name == "AutoMinkGUI"
+        or v.Name == "CleanRaceTextUI"
+        or v.Name == "RaceCleanOneText"
+        or v.Name == "RaceSmallTextUI"
+        then
+            v:Destroy()
+        end
+    end
+end
+
+pcall(function() clearOldGui(CoreGui) end)
+pcall(function() clearOldGui(plr.PlayerGui) end)
+
+task.wait(0.5)
+getgenv().AUTO_RACE_V3 = true
+
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until plr and plr.Character
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
 local VIM = game:GetService("VirtualInputManager")
 
-local plr = Players.LocalPlayer
 local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 local SEA2_PLACE = 4442272183
 local TWEEN_SPEED = 285
 
--- Đổi thứ tự race muốn làm ở đây
--- Script sẽ làm V2/V3 race hiện tại trước, xong mới reroll sang race tiếp theo.
+-- Thứ tự race muốn làm
 local RACE_QUEUE = {
-    "Rabbit", -- Mink/Rabbit
     "Angel",
+    "Rabbit",
     "Human",
     "Shark",
 }
 
---// CLEAN TEXT UI
+--// SMALL CLEAN TEXT UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "CleanRaceTextUI"
+gui.Name = "RaceSmallTextUI"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 pcall(function() gui.Parent = CoreGui end)
 if not gui.Parent then gui.Parent = plr:WaitForChild("PlayerGui") end
 
-local text = Instance.new("TextLabel")
-text.Name = "StatusText"
-text.AnchorPoint = Vector2.new(0.5, 0.5)
-text.Position = UDim2.new(0.5, 0, 0.32, 0)
-text.Size = UDim2.new(1, 0, 0, 90)
-text.BackgroundTransparency = 1
-text.Text = "Loading..."
-text.TextColor3 = Color3.fromRGB(255, 255, 255)
-text.TextStrokeTransparency = 0.35
-text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-text.Font = Enum.Font.GothamBold
-text.TextScaled = true
-text.Parent = gui
+local label = Instance.new("TextLabel")
+label.AnchorPoint = Vector2.new(0.5, 0.5)
+label.Position = UDim2.new(0.5, 0, 0.28, 0)
+label.Size = UDim2.new(0, 520, 0, 70)
+label.BackgroundTransparency = 1
+label.Text = "Loading..."
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.35
+label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+label.Font = Enum.Font.GothamBold
+label.TextScaled = false
+label.TextSize = 46
+label.Parent = gui
 
 local function ui(msg)
-    text.Text = tostring(msg)
+    label.Text = tostring(msg)
     print("[AUTO RACE]", msg)
 end
 
@@ -72,15 +88,14 @@ local function getChar()
 end
 
 local function getHRP()
-    local ch = getChar()
-    return ch:WaitForChild("HumanoidRootPart", 20)
+    return getChar():WaitForChild("HumanoidRootPart", 20)
 end
 
 local function getHum()
     return getChar():WaitForChild("Humanoid", 20)
 end
 
-local function currentRace()
+local function rawRace()
     local ok, val = pcall(function()
         return tostring(plr.Data.Race.Value)
     end)
@@ -90,11 +105,13 @@ end
 local function normRace(r)
     r = tostring(r or "")
     if r == "Mink" then return "Rabbit" end
+    if r == "Skypiea" or r == "Sky" then return "Angel" end
+    if r == "Fishman" then return "Shark" end
     return r
 end
 
-local function raceMatches(a, b)
-    return normRace(a) == normRace(b)
+local function currentRace()
+    return normRace(rawRace())
 end
 
 plr.Idled:Connect(function()
@@ -103,7 +120,7 @@ plr.Idled:Connect(function()
 end)
 
 task.spawn(function()
-    while task.wait(5) do
+    while getgenv().AUTO_RACE_V3 and task.wait(5) do
         pcall(function()
             if not getChar():FindFirstChild("HasBuso") then
                 safeInvoke("Buso")
@@ -164,7 +181,7 @@ local function resetRaceCache()
 end
 
 local function hasV2()
-    local r = currentRace()
+    local r = rawRace()
     if v2CacheRace == r and v2Cache ~= nil then return v2Cache end
     v2CacheRace = r
     v2Cache = (safeInvoke("Alchemist", "1") == -2)
@@ -172,20 +189,16 @@ local function hasV2()
 end
 
 local function hasV3()
-    local r = currentRace()
+    local r = rawRace()
     if v3CacheRace == r and v3Cache ~= nil then return v3Cache end
     v3CacheRace = r
     v3Cache = (safeInvoke("Wenlocktoad", "1") == -2)
     return v3Cache
 end
 
---// V2 FLOWERS
+--// V2
 local AlchemistPos = CFrame.new(-2777.6001, 72.9661, -3574.7363)
-
-local FlowerNames = {
-    "Flower 1", "Flower 2", "Flower 3",
-    "Blue Flower", "Red Flower", "Yellow Flower"
-}
+local FlowerNames = {"Flower 1", "Flower 2", "Flower 3", "Blue Flower", "Red Flower", "Yellow Flower"}
 
 local FlowerSpots = {
     CFrame.new(-961.736, 74.477, -1074.745),
@@ -215,16 +228,12 @@ local function hasToolContains(txt)
     local bp = plr:FindFirstChildOfClass("Backpack")
     if bp then
         for _, v in ipairs(bp:GetChildren()) do
-            if v:IsA("Tool") and v.Name:lower():find(txt) then
-                return true
-            end
+            if v:IsA("Tool") and v.Name:lower():find(txt) then return true end
         end
     end
 
     for _, v in ipairs(getChar():GetChildren()) do
-        if v:IsA("Tool") and v.Name:lower():find(txt) then
-            return true
-        end
+        if v:IsA("Tool") and v.Name:lower():find(txt) then return true end
     end
 
     return false
@@ -292,9 +301,7 @@ local function findMob(names)
             and mob.Humanoid.Health > 0
         then
             for _, n in ipairs(names) do
-                if mob.Name:find(n) then
-                    return mob
-                end
+                if mob.Name:find(n) then return mob end
             end
         end
     end
@@ -321,7 +328,6 @@ local function attackNearby()
         end
 
         if #targets <= 0 then return end
-
         net:WaitForChild("RE/RegisterAttack"):FireServer(0)
 
         local args = {nil, {}}
@@ -347,7 +353,8 @@ local function farmYellowFlower()
 
     if mob then
         local timeout = tick() + 120
-        while mob.Parent
+        while getgenv().AUTO_RACE_V3
+            and mob.Parent
             and mob:FindFirstChild("Humanoid")
             and mob.Humanoid.Health > 0
             and not hasToolContains("yellow")
@@ -368,7 +375,6 @@ local function doV2()
     end
 
     ensureSea2()
-
     ui("Start V2!")
     tweenTo(AlchemistPos)
     task.wait(1)
@@ -468,7 +474,6 @@ local function doRabbitV3()
 
         for _, cf in ipairs(ChestSpots) do
             if hasV3() then return true end
-
             tweenTo(cf + Vector3.new(0, 3, 0))
             task.wait(0.25)
             pressE()
@@ -477,7 +482,6 @@ local function doRabbitV3()
         end
 
         submitV3()
-        if hasV3() then return true end
     end
 
     return hasV3()
@@ -487,16 +491,10 @@ local function doAngelV3()
     ui("Start Angel V3!")
     acceptV3Quest()
 
-    -- Angel V3 cần kill player có race Angel.
-    -- Script không thể tự bảo đảm target hợp lệ; hãy kill 1 người race Angel sau khi nhận quest.
-    -- Script sẽ đứng check và tự submit lại Arowe.
-    while getgenv().AUTO_RACE_V3 and normRace(currentRace()) == "Angel" and not hasV3() do
+    while getgenv().AUTO_RACE_V3 and currentRace() == "Angel" and not hasV3() do
         ui("Kill Angel Player!")
         task.wait(5)
-
         submitV3()
-        if hasV3() then break end
-
         task.wait(3)
     end
 
@@ -507,7 +505,7 @@ local function doUnsupportedV3(r)
     ui(r .. " V3 Manual!")
     acceptV3Quest()
 
-    while getgenv().AUTO_RACE_V3 and normRace(currentRace()) == normRace(r) and not hasV3() do
+    while getgenv().AUTO_RACE_V3 and currentRace() == r and not hasV3() do
         ui(r .. " Quest Manual")
         task.wait(6)
         submitV3()
@@ -528,8 +526,7 @@ local function doV3()
 
     ensureSea2()
 
-    local r = normRace(currentRace())
-
+    local r = currentRace()
     if r == "Rabbit" then
         return doRabbitV3()
     elseif r == "Angel" then
@@ -539,7 +536,7 @@ local function doV3()
     end
 end
 
---// REROLL NEXT RACE
+--// REROLL
 local function nextRaceAfter(r)
     r = normRace(r)
     for i, rr in ipairs(RACE_QUEUE) do
@@ -555,15 +552,18 @@ local function rerollTo(target)
     if not target then return false end
     target = normRace(target)
 
-    ui("Reroll " .. target)
-
     local tries = 0
-    while getgenv().AUTO_RACE_V3 and not raceMatches(currentRace(), target) do
+    while getgenv().AUTO_RACE_V3 and currentRace() ~= target do
         tries += 1
         ui("Reroll " .. target .. " #" .. tries)
         safeInvoke("BlackbeardReward", "Reroll", "2")
         resetRaceCache()
         task.wait(2)
+
+        if tries % 10 == 0 and currentRace() ~= target then
+            ui("Check Fragments!")
+            task.wait(3)
+        end
     end
 
     ui("Race " .. target .. "!")
@@ -576,7 +576,7 @@ task.spawn(function()
         pcall(function()
             ensureSea2()
 
-            local r = normRace(currentRace())
+            local r = currentRace()
             ui(r .. " Check!")
 
             if not hasV2() then
