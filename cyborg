@@ -1,4 +1,3 @@
-
 repeat task.wait() until game:IsLoaded()
 getgenv().Config = {
     TEAM = "Pirates" -- lua chon Marines Hoac Pirates
@@ -23,25 +22,29 @@ if game:GetService("Players").LocalPlayer.Team == nil then
     task.wait(3)
 end
 
+--// CYBORG SPEEDRUN KAITUN V2
+--// 50 chest route
+--// Hard teleport CFrame, no tween jitter
+--// Auto resume after death / respawn
+--// Auto Fist -> Lab -> Order raid -> attack Order -> repeat until Core Brain -> change Cyborg
+
+repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game:GetService("Players").LocalPlayer
-repeat task.wait() until game:GetService("Players").LocalPlayer.Character
 
 getgenv().CYBORG_AUTO = true
-getgenv().TweenSpeed = 350
+getgenv().HardTpDelay = 0.12
 getgenv().HopMaxPlayers = 8
-getgenv().AutoHopNoChest = false
+getgenv().AutoHopNoFistAfterLoops = 0 -- 0 = off, set 3/5 nếu muốn hop sau vài vòng không ra Fist
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
-local VIM = game:GetService("VirtualInputManager")
 
 local LP = Players.LocalPlayer
 local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 local function status(...)
-    print("[CYBORG]", ...)
+    print("[CYBORG V2]", ...)
 end
 
 LP.Idled:Connect(function()
@@ -53,39 +56,55 @@ local function getChar()
     return LP.Character or LP.CharacterAdded:Wait()
 end
 
+local function waitAlive()
+    local char = getChar()
+    local hum = char:WaitForChild("Humanoid", 20)
+    local hrp = char:WaitForChild("HumanoidRootPart", 20)
+
+    while getgenv().CYBORG_AUTO and (not hum or hum.Health <= 0 or not hrp) do
+        LP.CharacterAdded:Wait()
+        task.wait(1)
+        char = getChar()
+        hum = char:WaitForChild("Humanoid", 20)
+        hrp = char:WaitForChild("HumanoidRootPart", 20)
+    end
+
+    return char, hum, hrp
+end
+
 local function getHRP()
-    return getChar():WaitForChild("HumanoidRootPart")
+    local _, _, hrp = waitAlive()
+    return hrp
 end
 
 local function getHum()
-    return getChar():WaitForChild("Humanoid")
+    local _, hum = waitAlive()
+    return hum
 end
 
-local function tweenTo(cf)
-    local hrp = getHRP()
-    local dist = (hrp.Position - cf.Position).Magnitude
+local function hardTP(cf)
+    local char, hum, hrp = waitAlive()
+    if not hrp then return false end
 
     pcall(function()
-        for _, v in ipairs(getChar():GetDescendants()) do
+        for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.CanCollide = false
+                v.Velocity = Vector3.zero
+                v.RotVelocity = Vector3.zero
             end
         end
     end)
 
-    if dist < 10 then
-        hrp.CFrame = cf
-        return true
-    end
+    pcall(function()
+        if hum.Sit then
+            hum.Sit = false
+            hum.Jump = true
+        end
+    end)
 
-    local tw = TweenService:Create(
-        hrp,
-        TweenInfo.new(dist / getgenv().TweenSpeed, Enum.EasingStyle.Linear),
-        {CFrame = cf}
-    )
-
-    tw:Play()
-    tw.Completed:Wait()
+    hrp.CFrame = cf
+    task.wait(getgenv().HardTpDelay or 0.12)
     return true
 end
 
@@ -94,11 +113,7 @@ local function safeInvoke(...)
     local ok, res = pcall(function()
         return CommF:InvokeServer(table.unpack(args))
     end)
-
-    if ok then
-        return res
-    end
-
+    if ok then return res end
     warn("[CYBORG] Invoke error:", res)
     return nil
 end
@@ -106,16 +121,7 @@ end
 local function hasItem(name)
     local bp = LP:FindFirstChildOfClass("Backpack")
     local ch = LP.Character
-
-    if bp and bp:FindFirstChild(name) then
-        return true
-    end
-
-    if ch and ch:FindFirstChild(name) then
-        return true
-    end
-
-    return false
+    return (bp and bp:FindFirstChild(name)) or (ch and ch:FindFirstChild(name))
 end
 
 local function equipMelee()
@@ -189,14 +195,10 @@ local function HopServer(reason)
             end
         end
 
-        if #all > 0 then
-            break
-        end
+        if #all > 0 then break end
     end
 
-    table.sort(all, function(a, b)
-        return a.Count < b.Count
-    end)
+    table.sort(all, function(a, b) return a.Count < b.Count end)
 
     local chosen = all[1]
     if not chosen then
@@ -222,33 +224,66 @@ local function HopServer(reason)
 end
 
 local ChestSpots = {
+    CFrame.new(-385, 73, 285),
+    CFrame.new(-500, 74, 316),
+    CFrame.new(-605, 73, 274),
+    CFrame.new(-681, 73, 192),
+    CFrame.new(-735, 73, 100),
+    CFrame.new(-815, 73, -30),
+    CFrame.new(-905, 73, -115),
+    CFrame.new(-1015, 73, -185),
+    CFrame.new(-1115, 73, -300),
+    CFrame.new(-1220, 73, -430),
     CFrame.new(-1204, 7, -5089),
     CFrame.new(-1121, 14, -5077),
     CFrame.new(-1068, 14, -5172),
     CFrame.new(-941, 14, -5154),
     CFrame.new(-879, 13, -5089),
+    CFrame.new(-780, 15, -4990),
+    CFrame.new(-670, 15, -5080),
+    CFrame.new(-550, 15, -5195),
+    CFrame.new(-430, 15, -5120),
+    CFrame.new(-330, 15, -5000),
+    CFrame.new(-5420, 15, -524),
+    CFrame.new(-5533, 15, -712),
+    CFrame.new(-5402, 15, -841),
+    CFrame.new(-5250, 16, -960),
+    CFrame.new(-5100, 16, -1090),
+    CFrame.new(-4970, 16, -1215),
+    CFrame.new(-4825, 16, -1340),
+    CFrame.new(-4680, 16, -1475),
+    CFrame.new(-4550, 16, -1600),
+    CFrame.new(-4430, 16, -1720),
     CFrame.new(-1927, 10, -11682),
     CFrame.new(-1858, 15, -11702),
     CFrame.new(-1698, 14, -11964),
     CFrame.new(-1621, 15, -12111),
-    CFrame.new(-2790, 73, -3571),
-    CFrame.new(-2885, 73, -3460),
-    CFrame.new(-3030, 73, -3375),
-    CFrame.new(-5420, 15, -524),
-    CFrame.new(-5533, 15, -712),
-    CFrame.new(-5402, 15, -841),
+    CFrame.new(-1500, 15, -12200),
+    CFrame.new(-1380, 15, -12070),
+    CFrame.new(-1260, 15, -11940),
+    CFrame.new(-1140, 15, -11820),
+    CFrame.new(-1020, 15, -11700),
+    CFrame.new(-900, 15, -11580),
     CFrame.new(574, 70, -2870),
     CFrame.new(646, 70, -2962),
     CFrame.new(505, 70, -3085),
+    CFrame.new(390, 70, -2980),
+    CFrame.new(280, 70, -2860),
+    CFrame.new(165, 70, -2740),
+    CFrame.new(50, 70, -2620),
+    CFrame.new(-65, 70, -2500),
+    CFrame.new(-180, 70, -2380),
+    CFrame.new(-295, 70, -2260),
 }
 
 local function getNearestChest()
     local best, bestDist = nil, math.huge
+    local hrp = getHRP()
 
     for _, obj in ipairs(workspace:GetDescendants()) do
         local n = obj.Name:lower()
         if n:find("chest") then
-            local part = nil
+            local part
 
             if obj:IsA("BasePart") then
                 part = obj
@@ -257,7 +292,7 @@ local function getNearestChest()
             end
 
             if part then
-                local dist = (part.Position - getHRP().Position).Magnitude
+                local dist = (part.Position - hrp.Position).Magnitude
                 if dist < bestDist then
                     best = part
                     bestDist = dist
@@ -270,50 +305,58 @@ local function getNearestChest()
 end
 
 local function farmChestUntilFist()
-    status("Farm chest for Fist of Darkness")
-
+    status("Farm 50 chest route for Fist of Darkness")
     local loopCount = 0
 
     while getgenv().CYBORG_AUTO and not hasItem("Fist of Darkness") do
         loopCount += 1
 
-        local chest = getNearestChest()
-        if chest then
-            status("Collect chest")
-            tweenTo(chest.CFrame + Vector3.new(0, 3, 0))
-            task.wait(0.25)
-        else
-            for _, cf in ipairs(ChestSpots) do
-                if hasItem("Fist of Darkness") then break end
-                tweenTo(cf + Vector3.new(0, 3, 0))
-                task.wait(0.25)
+        for i, cf in ipairs(ChestSpots) do
+            if not getgenv().CYBORG_AUTO or hasItem("Fist of Darkness") then break end
+
+            local chest = getNearestChest()
+            if chest then
+                status("Chest nearest")
+                hardTP(chest.CFrame + Vector3.new(0, 3, 0))
+            else
+                status("Chest spot " .. tostring(i) .. "/50")
+                hardTP(cf + Vector3.new(0, 3, 0))
+            end
+
+            task.wait(0.06)
+        end
+
+        status("Chest loop " .. tostring(loopCount) .. " done")
+
+        if getgenv().AutoHopNoFistAfterLoops and getgenv().AutoHopNoFistAfterLoops > 0 then
+            if loopCount >= getgenv().AutoHopNoFistAfterLoops and not hasItem("Fist of Darkness") then
+                HopServer("No Fist After Chest Loops")
+                task.wait(10)
+                loopCount = 0
             end
         end
-
-        if loopCount % 5 == 0 and getgenv().AutoHopNoChest then
-            HopServer("No Fist")
-            task.wait(10)
-        end
-
-        task.wait(0.2)
     end
 
     return hasItem("Fist of Darkness")
 end
 
-local SecretLabFistPos = CFrame.new(-6438, 250, -4501)
-local SecretLabCorePos = CFrame.new(-6438, 250, -4501)
+local SecretLabPos = CFrame.new(-6438, 250, -4501)
 
 local function clickAllLabButtons()
     pcall(function()
         local map = workspace:FindFirstChild("Map")
-        if map then
-            for _, obj in ipairs(map:GetDescendants()) do
-                if obj:IsA("ClickDetector") then
-                    local full = obj:GetFullName():lower()
-                    if full:find("raid") or full:find("button") or full:find("laboratory") or full:find("circle") then
-                        fireclickdetector(obj)
-                    end
+        if not map then return end
+
+        for _, obj in ipairs(map:GetDescendants()) do
+            if obj:IsA("ClickDetector") then
+                local full = obj:GetFullName():lower()
+                if full:find("raid")
+                or full:find("button")
+                or full:find("laboratory")
+                or full:find("circle")
+                or full:find("order")
+                then
+                    fireclickdetector(obj)
                 end
             end
         end
@@ -321,8 +364,8 @@ local function clickAllLabButtons()
 end
 
 local function insertFist()
-    status("Insert Fist at Secret Laboratory")
-    tweenTo(SecretLabFistPos)
+    status("Insert Fist")
+    hardTP(SecretLabPos)
     task.wait(1)
     clickAllLabButtons()
     task.wait(2)
@@ -330,7 +373,6 @@ end
 
 local function buyMicrochip()
     status("Buy Microchip")
-
     safeInvoke("BlackbeardReward", "Microchip", "2")
     task.wait(0.7)
     safeInvoke("BlackbeardReward", "Microchip", "Buy")
@@ -362,23 +404,21 @@ end
 
 local function attackOrderBoss()
     local boss = findOrderBoss()
-    if not boss then
-        return false
-    end
+    if not boss then return false end
 
     status("Attack Order Boss")
     equipMelee()
 
-    repeat task.wait(0.1)
+    repeat task.wait(0.08)
         pcall(function()
-            if not boss:FindFirstChild("HumanoidRootPart") then return end
+            if not boss.Parent or not boss:FindFirstChild("HumanoidRootPart") then return end
 
-            tweenTo(boss.HumanoidRootPart.CFrame * CFrame.new(0, 25, 8))
+            hardTP(boss.HumanoidRootPart.CFrame * CFrame.new(0, 25, 8))
 
             local net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
             net:WaitForChild("RE/RegisterAttack"):FireServer(0)
 
-            local head = boss:FindFirstChild("Head") or boss:FindFirstChild("HumanoidRootPart")
+            local head = boss:FindFirstChild("Head") or boss.HumanoidRootPart
             net:WaitForChild("RE/RegisterHit"):FireServer(
                 head,
                 {
@@ -395,7 +435,7 @@ local function attackOrderBoss()
         or boss.Humanoid.Health <= 0
         or hasItem("Core Brain")
 
-    status("Order Boss Done")
+    status("Order Boss Dead/Done")
     task.wait(2)
     return true
 end
@@ -407,7 +447,7 @@ local function runOrderUntilCoreBrain()
 
         local started = tick()
 
-        repeat task.wait(1)
+        repeat task.wait(0.8)
             if hasItem("Core Brain") then break end
 
             local boss = findOrderBoss()
@@ -418,9 +458,7 @@ local function runOrderUntilCoreBrain()
             end
         until hasItem("Core Brain") or tick() - started > 90
 
-        if hasItem("Core Brain") then
-            break
-        end
+        if hasItem("Core Brain") then break end
 
         status("No Core Brain -> Repeat Order")
         task.wait(3)
@@ -430,8 +468,8 @@ local function runOrderUntilCoreBrain()
 end
 
 local function changeCyborg()
-    status("Core Brain Found -> Secret Laboratory")
-    tweenTo(SecretLabCorePos)
+    status("Core Brain -> Secret Laboratory")
+    hardTP(SecretLabPos)
     task.wait(1)
 
     clickAllLabButtons()
@@ -444,10 +482,17 @@ local function changeCyborg()
     status("CYBORG DONE")
 end
 
+LP.CharacterAdded:Connect(function()
+    task.wait(2)
+    status("Respawn detected -> resume script")
+end)
+
 task.spawn(function()
-    status("CYBORG SPEEDRUN LOADED")
+    status("CYBORG SPEEDRUN V2 LOADED")
 
     while getgenv().CYBORG_AUTO do
+        waitAlive()
+
         if hasItem("Core Brain") then
             changeCyborg()
             break
@@ -457,14 +502,20 @@ task.spawn(function()
             farmChestUntilFist()
         end
 
+        waitAlive()
+
         if hasItem("Fist of Darkness") then
             insertFist()
             task.wait(2)
         end
 
+        waitAlive()
+
         if not hasItem("Core Brain") then
             runOrderUntilCoreBrain()
         end
+
+        waitAlive()
 
         if hasItem("Core Brain") then
             changeCyborg()
