@@ -1,0 +1,941 @@
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game.Players
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+spawn(function()
+    while task.wait(1) do
+        if game:GetService("CoreGui").RobloxPromptGui.promptOverlay:FindFirstChild("ErrorPrompt") and not string.find(game:GetService("CoreGui").RobloxPromptGui.promptOverlay.ErrorPrompt.MessageArea.ErrorFrame.ErrorMessage
+                .Text, "Server is full") then
+            game:GetService("TeleportService"):Teleport(game.PlaceId, game:GetService("Players").LocalPlayer)
+        end
+    end
+end)
+
+do    
+    do
+        repeat
+            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer("SetTeam", "Pirates") -- Marines / Pirates
+        until game.Players.LocalPlayer.Team
+        repeat wait() until game.Players.LocalPlayer.Character
+    end
+end
+spawn(function()
+    while true do  
+        if game.PlaceId ~= 4442272183 then
+            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("TravelDressrosa")
+        end
+        task.wait(5)
+    end
+end)
+spawn(function()
+    while game:GetService("Players").LocalPlayer.Character and not game:GetService("Players").LocalPlayer.Character:FindFirstChild("HasBuso") do
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Buso")
+        if game.Players.LocalPlayer.Character.Humanoid.Sit then
+            game.Players.LocalPlayer.Character:WaitForChild("Humanoid").Jump = true 
+        end           
+        wait(5)
+    end
+end)
+spawn(function()
+    while task.wait() do
+        pcall(function() 
+            if not game.Players.LocalPlayer.PlayerGui.ScreenGui:FindFirstChild("ImageLabel") then
+                game:GetService("VirtualInputManager"):SendKeyEvent(true, "E", false, game)
+                game:GetService("VirtualInputManager"):SendKeyEvent(false, "E", false, game)
+                task.wait(3)
+            end
+        end)
+    end
+end)
+local VirtualUser = game:GetService('VirtualUser')
+
+game:GetService('Players').LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PlaceId = 4442272183
+
+-- Server hop API lấy từ AryaMain.lua: dùng __ServerBrowser thay vì TeleportToPlaceInstance
+local LastServersDataPulled = nil
+local CachedServers = nil
+
+local function IfTableHaveIndex(t)
+    if type(t) ~= "table" then
+        return false
+    end
+    for _ in pairs(t) do
+        return true
+    end
+    return false
+end
+
+local function GetServers()
+    if LastServersDataPulled and CachedServers then
+        if os.time() - LastServersDataPulled < 60 then
+            return CachedServers
+        end
+    end
+
+    local Browser = ReplicatedStorage:WaitForChild("__ServerBrowser")
+    for i = 1, 100 do
+        local ok, data = pcall(function()
+            return Browser:InvokeServer(i)
+        end)
+
+        if ok and IfTableHaveIndex(data) then
+            LastServersDataPulled = os.time()
+            CachedServers = data
+            return data
+        end
+    end
+
+    return nil
+end
+
+function HopServer(maxPlayers, region)
+    maxPlayers = tonumber(maxPlayers) or 10
+
+    local servers = GetServers()
+    if not servers then
+        warn("[HOP] Không lấy được server list")
+        return false
+    end
+
+    local list = {}
+    for jobId, data in pairs(servers) do
+        table.insert(list, {
+            JobId = jobId,
+            Players = tonumber(data.Count) or 0,
+            Region = data.Region
+        })
+    end
+
+    if #list <= 0 then
+        warn("[HOP] Empty server list")
+        return false
+    end
+
+    local chosen = nil
+    for _ = 1, 150 do
+        local pick = list[math.random(1, #list)]
+        if pick and pick.JobId ~= game.JobId then
+            if pick.Players < maxPlayers then
+                if (not region or pick.Region == region) then
+                    chosen = pick
+                    break
+                end
+            end
+        end
+    end
+
+    -- fallback: nếu không có server dưới maxPlayers thì chọn server khác bất kỳ trong list
+    if not chosen then
+        for _, pick in ipairs(list) do
+            if pick.JobId ~= game.JobId then
+                chosen = pick
+                break
+            end
+        end
+    end
+
+    if not chosen then
+        warn("[HOP] Không tìm được server phù hợp")
+        return false
+    end
+
+    print("[HOP] Teleport ->", chosen.JobId, "| Players:", chosen.Players, "| Region:", tostring(chosen.Region))
+
+    local ok, err = pcall(function()
+        ReplicatedStorage:WaitForChild("__ServerBrowser"):InvokeServer("teleport", chosen.JobId)
+    end)
+
+    if not ok then
+        warn("[HOP ERROR]", err)
+        return false
+    end
+
+    return true
+end
+
+local function HopServer(10)
+    return HopServer(10)
+end
+--[[
+    local Settings = {}
+    local HttpService = game:GetService("HttpService")
+
+    local SaveFileName = "huuthangdz.json"
+
+    function SaveSettings()
+        local HttpService = game:GetService("HttpService")
+        if not isfolder("huuthangdz") then
+            makefolder("huuthangdz")
+        end
+        writefile("huuthangdz/" .. SaveFileName, HttpService:JSONEncode(Settings))
+    end
+
+    function ReadSetting()
+        local s, e = pcall(function()
+            local HttpService = game:GetService("HttpService")
+            if not isfolder("huuthangdz") then
+                makefolder("huuthangdz")
+            end
+            return HttpService:JSONDecode(readfile("huuthangdz/" .. SaveFileName))
+        end)
+        if s then
+            return e
+        else
+            SaveSettings()
+            return ReadSetting()
+        end
+    end
+
+    Settings = ReadSetting()
+
+    function HopServer()
+        local function Hop()
+            for i = 1, 100 do
+                local huhu = game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer(i)
+                if huhu then
+                    for k, v in pairs(huhu) do
+                        if k ~= game.JobId and v.Count < 10 then
+                            if not Settings[k] or tick() - Settings[k].Time > 60 * 10 then
+                                Settings = ReadSetting()
+                                Settings[k] = {
+                                    Time = tick()
+                                }
+                                SaveSettings()
+                                game:GetService("ReplicatedStorage").__ServerBrowser:InvokeServer("teleport", k)
+                                return true
+                            elseif tick() - Settings[k].Time > 60 * 60 then
+                                Settings[k] = nil
+                            end
+                        end
+                    end
+                end
+            end
+            return false
+        end
+        if not getgenv().Loaded then
+            local function child(v)
+                if v.Name == "ErrorPrompt" then
+                    if v.Visible then
+                        if v.TitleFrame.ErrorTitle.Text == "Teleport Failed" then
+                            HopServer()
+                        end
+                    end
+                    v:GetPropertyChangedSignal("Visible"):Connect(function()
+                        if v.Visible then
+                            if v.TitleFrame.ErrorTitle.Text == "Teleport Failed" then
+                                HopServer()
+                            end
+                        end
+                    end)
+                end
+            end
+            for k, v in pairs(game.CoreGui.RobloxPromptGui.promptOverlay:GetChildren()) do
+                child(v)
+            end
+            game.CoreGui.RobloxPromptGui.promptOverlay.ChildAdded:Connect(child)
+            getgenv().Loaded = true
+        end
+        while not Hop() do task.wait() end
+    end
+    local starthop = false
+    task.spawn(function()
+        while task.wait() do 
+            if starthop then
+                HopServer()
+            end
+        end
+    end)
+]]
+function checkcountitem(x,xx)
+    for i,v in next,game.ReplicatedStorage.Remotes.CommF_:InvokeServer("getInventory") do
+        if v.Name == x and v.Count >= xx then
+            return true
+        end
+    end
+    return false
+end
+function poscheckspawn(pos)
+    dist = math.huge
+    local name
+    for i,v in next,game:GetService("Workspace")["_WorldOrigin"].PlayerSpawns.Pirates:GetChildren() do
+        if v:IsA("Model") then
+            local magnitude = (v.Part.Position - pos).magnitude
+            if magnitude < dist then
+                dist = magnitude
+                name = v
+            end
+        end
+    end
+    return name
+end
+local plr = game.Players.LocalPlayer
+TableLocations = {
+    ["GhostShipInterior"] = game:GetService("Workspace").Map.GhostShipInterior.TeleportSpawn.Position
+}
+function toTarget(pos, targetPos, targetCFrame,TpInstant)
+    if game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and game.Players.LocalPlayer.Character.Humanoid.Sit then
+        getgenv().noclip = false
+        if getgenv().Tween then
+            getgenv().Tween:Pause()
+            getgenv().Tween:Cancel()
+        end
+        game.Players.LocalPlayer.Character.Humanoid.Sit = false
+        game.Players.LocalPlayer.Character.Humanoid.Jump = true
+        plr.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame*CFrame.new(0,10,0)
+        return 
+    end
+    local aaa = 200
+    local tween_s = game:service"TweenService"
+    local info = TweenInfo.new((targetPos - pos).Magnitude/aaa, Enum.EasingStyle.Quad)
+    if game.PlaceId == 4442272183 and (targetPos-game:GetService("Workspace").Map.GhostShipInterior.TeleportSpawn.Position).Magnitude > 3000 and  (game:GetService("Workspace").Map.GhostShipInterior.TeleportSpawn.Position-plr.Character.HumanoidRootPart.Position).Magnitude <= 3000 then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("requestEntrance",game:GetService("Workspace").Map.GhostShipInterior.TeleportSpawn.Position)
+        return 
+    end
+    if TableLocations then
+        for i,v2 in pairs(TableLocations) do
+            if  (targetPos-v2).Magnitude <= 3000 and  (targetPos-plr.Character.HumanoidRootPart.Position).Magnitude >= 3000 then
+                if getgenv().Tween then
+                    getgenv().Tween:Pause()
+                    getgenv().Tween:Cancel()
+                end
+                args = {
+                    "requestEntrance",
+                    v2,
+                }
+                game.ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+                return 
+            end
+        end
+    end
+    if (targetPos-pos).Magnitude >= 3000 and poscheckspawn(targetPos).Name ~= game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value  then
+        if getgenv().Tween then
+            getgenv().Tween:Pause()
+            getgenv().Tween:Cancel()
+        end
+        plr.Character.LastSpawnPoint.Disabled = true
+        local TimeReset = tick()
+        repeat task.wait()
+            plr.Character.LastSpawnPoint.Disabled = true
+            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("SetLastSpawnPoint", poscheckspawn(targetPos).Name)
+            plr.Character.HumanoidRootPart.CFrame = poscheckspawn(targetPos).Part.CFrame
+            if tick()-TimeReset >= 3 and plr.Character.Humanoid.Health > 0 then
+                plr.Character.Humanoid.Health = 0
+                task.wait()
+                TimeReset = tick()
+            end
+        until poscheckspawn(targetPos).Name == game:GetService("Players").LocalPlayer.Data.LastSpawnPoint.Value 
+        plr.Character.Humanoid.Health = 0
+        repeat task.wait()
+        until plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 
+        return
+    end
+    if game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+        if (targetPos-pos).Magnitude <= 200 and not TpInstant then
+            if getgenv().Tween then
+                getgenv().Tween:Pause()
+                getgenv().Tween:Cancel()
+            end
+            getgenv().noclip = true
+            plr.Character.HumanoidRootPart.CFrame = targetCFrame
+        else
+            local a = Vector3.new(0,plr.Character:FindFirstChild("HumanoidRootPart").Position.Y,0) 
+            local b = Vector3.new(0,game:GetService("Workspace").Map["WaterBase-Plane"].Position.Y,0)
+            if (a-b).Magnitude <= 60 then
+                plr.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame*CFrame.new(0,20,0)
+            end
+            getgenv().Tween = tween_s:Create(game:GetService("Players").LocalPlayer.Character:WaitForChild("HumanoidRootPart"), info, {CFrame = targetCFrame})
+            getgenv().noclip = true
+            getgenv().Tween:Play()
+        end
+    end
+end
+local function DisableNoClip()
+    if NoClipConnection then
+        NoClipConnection:Disconnect()
+        NoClipConnection = nil
+    end
+end
+getgenv().GetBladeHits = function()
+    local targets = {}
+    local function GetDistance(v)
+        return (v.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+    end
+    for _, v in pairs(game:GetService("Workspace").Enemies:GetChildren()) do
+        if v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Head") and v:FindFirstChild("Humanoid") then
+            if GetDistance(v.HumanoidRootPart.CFrame) < 60 then
+                table.insert(targets, v)
+            end
+        end
+    end
+    return targets
+end
+
+getgenv().AttackAll = function()
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    
+    if not character then return end
+    
+    local equippedWeapon = character:FindFirstChild("EquippedWeapon")
+    if not equippedWeapon then return end
+    
+    local weaponData = require(game.ReplicatedStorage.Modules.CombatUtil):GetWeaponData(equippedWeapon:GetAttribute("WeaponName"))
+    if not weaponData or weaponData.WeaponType ~= "Melee" then return end
+    
+    local enemies = GetBladeHits()
+    if #enemies > 0 then
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        local netModule = replicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+        
+        netModule:WaitForChild("RE/RegisterAttack"):FireServer(-math.huge)
+        
+        local args = {nil, {}}
+        for i, v in pairs(enemies) do
+            if not args[1] then
+                args[1] = v.Head
+            end
+            args[2][i] = {
+                [1] = v,
+                [2] = v.HumanoidRootPart
+            }
+        end
+        
+        netModule:WaitForChild("RE/RegisterHit"):FireServer(unpack(args))
+        netModule:WaitForChild("RE/RegisterAttack"):FireServer(-math.huge)
+    end
+end
+
+local function EnableNoClip()
+    DisableNoClip()
+
+    NoClipConnection = game:GetService("RunService").Stepped:Connect(function()
+        if not game:GetService("Players").LocalPlayer.Character then
+            return
+        end
+
+        for _, Item in pairs(game:GetService("Players").LocalPlayer.Character:GetDescendants()) do
+            if Item:IsA("BasePart") and Item.CanCollide then
+                Item.CanCollide = false
+            end
+        end
+    end)
+end
+function CheckNameBoss(bossName)
+    local enemies = game:GetService("Workspace").Enemies
+    if enemies:FindFirstChild(bossName) then
+        local boss = enemies[bossName]
+        if boss:IsA("Model") and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+            print("Boss được tìm thấy: ", boss.Name)
+            return boss
+        else
+            print("không có boss")
+        end
+    else
+        print("Không tìm thấy boss trong Workspace.Enemies.")
+    end
+    return nil
+end
+function EquipWeapon(ToolSe)
+    if game.Players.LocalPlayer.Backpack:FindFirstChild(ToolSe) then
+        getgenv().tool = game.Players.LocalPlayer.Backpack:FindFirstChild(ToolSe)
+        wait(.1)
+        game.Players.LocalPlayer.Character.Humanoid:EquipTool(tool)
+    end
+end
+function NameWeapon(x)
+    local a 
+    for i,v in next, game.Players.LocalPlayer.Backpack:GetChildren() do
+        if v:IsA("Tool") and v.ToolTip == x  then
+            a = v.Name
+        end
+    end
+    for i,v in next, game.Players.LocalPlayer.Character:GetChildren() do
+        if v:IsA("Tool") and v.ToolTip == x  then
+            a = v.Name
+        end
+    end
+    return a 
+end
+function checklocation()
+    local teleportLocation = game:GetService("Workspace").Map.GhostShipInterior.TeleportSpawn.Position
+    local teleportRadius = 1000 
+    local function isPlayerNearLocation(playerPosition, targetPosition, radius)
+        return (playerPosition - targetPosition).Magnitude <= radius
+    end
+    if not isPlayerNearLocation(game.Players.LocalPlayer.Character.HumanoidRootPart.Position, teleportLocation, teleportRadius) then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("requestEntrance", teleportLocation)
+    end
+end
+function DetectMob(c)
+    local dist = math.huge
+    local name 
+    for i, v in pairs(game.Workspace.Enemies:GetChildren()) do
+        local stringgsub = v.Name:gsub(" %pLv. %d+%p", "")
+        if  ((typeof(c) == "table" and (table.find(c, v.Name) or table.find(c, stringgsub))) or (v.Name == c or c == stringgsub)) and v:IsA('Model') and v:FindFirstChild('Humanoid') and v.Humanoid.Health > 0 and v:FindFirstChild('HumanoidRootPart') then
+            local magnitude = (v.HumanoidRootPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).magnitude
+            if magnitude < dist then
+                dist = magnitude
+                name = v
+            end
+        end
+    end
+    return name
+end
+local Mob = {}
+Mob = {
+    "Ship Deckhand",
+    "Ship Steward",
+    "Ship Officer",
+    "Ship Engineer",
+    "Cursed Captain"
+}
+function GetGhoul()
+    if game:GetService("Players").LocalPlayer.Data.Race.Value  ~= "Ghoul" then
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("Ectoplasm", "Change", 4)
+        task.wait()
+        if game:GetService("Players").LocalPlayer.Data.Race.Value  ~= "Ghoul" then
+            checklocation()
+            task.wait()
+            if not checkcountitem("Ectoplasm", 100) then
+                local boss = DetectMob(Mob)
+                while boss do
+                    task.wait()
+                    EnableNoClip()
+                    EquipWeapon(NameWeapon("Melee"))
+                    toTarget(
+                        game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position,
+                        boss.HumanoidRootPart.Position,
+                        boss.HumanoidRootPart.CFrame * CFrame.new(7, 20, 0)
+                    )
+                    if (plr.Character.HumanoidRootPart.Position - boss.HumanoidRootPart.Position).Magnitude < 50 then
+                        AttackAll()
+                    end
+                    if not boss or not boss.Parent or boss.Humanoid.Health == 0 then
+                        boss = DetectMob(Mob)
+                    end
+                end      
+            elseif game.Players.LocalPlayer.Backpack:FindFirstChild("Hellfire Torch") or game.Players.LocalPlayer.Character:FindFirstChild("Hellfire Torch") then
+                game.ReplicatedStorage.Remotes.CommF_:InvokeServer("Ectoplasm", "Buy", 4)
+            else  
+                task.wait(1.111111)
+                if CheckNameBoss("Cursed Captain") then
+                    local boss  = CheckNameBoss("Cursed Captain") 
+                    if boss then
+                        repeat task.wait()
+                            EnableNoClip()
+                            EquipWeapon(NameWeapon("Melee"))
+                            toTarget(game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position,boss.HumanoidRootPart.Position,boss.HumanoidRootPart.CFrame*CFrame.new(7,20,0))
+                            if (plr.Character.HumanoidRootPart.Position-boss.HumanoidRootPart.Position).Magnitude < 50 then
+                                AttackAll()
+                            end
+                        until not boss  or not boss.Parent or boss.Humanoid.Health == 0 
+                    end
+                else
+                    HopServer(10)
+                end
+            end
+        end
+    else
+        print("Đã có tộc Ghoul")
+        task.wait(300)
+    end
+end
+spawn(function()
+    while task.wait() do 
+        pcall(function()
+            GetGhoul()
+        end)
+    end
+end)
+
+--// AutoWebhook.lua gộp vào, chạy song song
+task.spawn(function()
+    repeat task.wait() until game:IsLoaded()
+    repeat task.wait() until game:GetService("Players").LocalPlayer
+    
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local HttpService = game:GetService("HttpService")
+    
+    local plr = Players.LocalPlayer
+    local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+    
+    local WEBHOOK_URL        = "https://discord.com/api/webhooks/1458265137457795113/QNyM6eqiK-jwlldq7tjhQo4JP2v6JxYSjdugIyCFwqHh3E6iflIfyqcrakL5-TTgxeGf"
+    local WAIT_FRUIT_APPEAR  = 12
+    local RETRY_INTERVAL     = 20
+    local SUCCESS_COOLDOWN   = 60 * 120
+    local CHECK_EVERY        = 0.25
+    local WAIT_BEFORE_STORE  = 3
+    
+    
+    local RED_FRUITS = {
+        mammoth = false,
+        trex = false,
+        dough = false,
+        venom = false,
+        gas = false,
+        spirit = false,
+        tiger = false,
+        yeti = false,
+        kitsune = true,
+        control = false,
+    }
+    
+    local function normName(s)
+        s = tostring(s or ""):lower()
+        s = s:gsub("%s+", "")
+        s = s:gsub("_", "")
+        return s
+    end
+    
+    
+    local function baseFruitKey(name)
+        local n = normName(name)
+    
+        if n:find("%-") then
+            local a, b = n:match("^(.-)%-(.-)$")
+            if a and b then
+                if a == b then
+                    return a
+                else
+                    return (a .. b)
+                end
+            end
+            n = n:gsub("%-", "")
+        end
+    
+        return n
+    end
+    
+    local function isRedFruit(name)
+        return RED_FRUITS[baseFruitKey(name)] == true
+    end
+    
+    local function getRequest()
+        return (syn and syn.request)
+            or (http and http.request)
+            or http_request
+            or request
+    end
+    
+    local function clampText(s, maxLen)
+        s = tostring(s or "")
+        if #s > maxLen then
+            return s:sub(1, maxLen - 3) .. "..."
+        end
+        return s
+    end
+    
+    local function postWebhook(payloadTable)
+        if not WEBHOOK_URL or WEBHOOK_URL == "" then
+            return
+        end
+    
+        local req = getRequest()
+        if not req then
+            warn("[WEBHOOK] Không tìm thấy hàm request (syn.request/http_request/request).")
+            return
+        end
+    
+        local body = HttpService:JSONEncode(payloadTable)
+        local ok, err = pcall(function()
+            req({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body
+            })
+        end)
+    
+        if not ok then
+            warn("[WEBHOOK] Send fail:", err)
+        end
+    end
+    
+    local function safeHideDialogue()
+        pcall(function()
+            local gui = plr:FindFirstChild("PlayerGui")
+            if not gui then return end
+            local main = gui:FindFirstChild("Main")
+            if not main then return end
+            local d = main:FindFirstChild("Dialogue")
+            if d and d.Visible == true then
+                d.Visible = false
+            end
+        end)
+    end
+    
+    local function getFruitTools_All()
+        local fruits = {}
+    
+        local bp = plr:FindFirstChildOfClass("Backpack")
+        if bp then
+            for _, t in ipairs(bp:GetChildren()) do
+                if t:IsA("Tool") and string.find(t.Name, "Fruit") then
+                    table.insert(fruits, t)
+                end
+            end
+        end
+    
+        local ch = plr.Character
+        if ch then
+            for _, t in ipairs(ch:GetChildren()) do
+                if t:IsA("Tool") and string.find(t.Name, "Fruit") then
+                    table.insert(fruits, t)
+                end
+            end
+        end
+    
+        return fruits
+    end
+    
+    local function getFruitTools_BackpackOnly()
+        local fruits = {}
+        local bp = plr:FindFirstChildOfClass("Backpack")
+        if not bp then return fruits end
+    
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") and string.find(t.Name, "Fruit") then
+                table.insert(fruits, t)
+            end
+        end
+        return fruits
+    end
+    
+    local function toolDisplayName(tool)
+        local n = tool and tool.Name or ""
+        pcall(function()
+            local o = tool:GetAttribute("OriginalName")
+            if o and tostring(o) ~= "" then
+                n = tostring(o)
+            end
+        end)
+        return tostring(n)
+    end
+    
+    local function getFruitNames_Backpack()
+        local names, seen = {}, {}
+        for _, tool in ipairs(getFruitTools_BackpackOnly()) do
+            local n = toolDisplayName(tool)
+            if not seen[n] then
+                seen[n] = true
+                table.insert(names, n)
+            end
+        end
+        table.sort(names, function(a, b) return tostring(a) < tostring(b) end)
+        return names
+    end
+    
+    local function countFruitInBackpackByName(targetName)
+        local c = 0
+        local tnorm = normName(targetName)
+        for _, tool in ipairs(getFruitTools_BackpackOnly()) do
+            if normName(toolDisplayName(tool)) == tnorm then
+                c += 1
+            end
+        end
+        return c
+    end
+    
+    local function snapshotFruitSet()
+        local set = {}
+        for _, tool in ipairs(getFruitTools_All()) do
+            set[tool] = true
+        end
+        return set
+    end
+    
+    local function findNewFruit(prevSet)
+        for _, tool in ipairs(getFruitTools_All()) do
+            if not prevSet[tool] then
+                return tool
+            end
+        end
+        return nil
+    end
+    
+    local function waitForNewFruit(prevSet, timeout)
+        local t0 = os.clock()
+        while os.clock() - t0 < timeout do
+            local newTool = findNewFruit(prevSet)
+            if newTool then
+                return newTool
+            end
+            task.wait(CHECK_EVERY)
+        end
+        return nil
+    end
+    
+    local function existsInBPOrChar(tool)
+        if not tool then return false end
+        local ok, parent = pcall(function() return tool.Parent end)
+        if not ok or not parent then return false end
+    
+        local bp = plr:FindFirstChildOfClass("Backpack")
+        local ch = plr.Character
+        if bp and tool:IsDescendantOf(bp) then return true end
+        if ch and tool:IsDescendantOf(ch) then return true end
+        return false
+    end
+    
+    local function ensureUnequip()
+        pcall(function()
+            local ch = plr.Character
+            if not ch then return end
+            local hum = ch:FindFirstChildOfClass("Humanoid")
+            if hum then hum:UnequipTools() end
+        end)
+    end
+    
+    local function moveToolToBackpack(tool)
+        local bp = plr:FindFirstChildOfClass("Backpack")
+        if not bp or not tool then return end
+        pcall(function()
+            tool.Parent = bp
+        end)
+    end
+    
+    local function storeFruitTool(tool)
+        if not tool then return false, "no tool" end
+    
+        safeHideDialogue()
+        ensureUnequip()
+        task.wait(0.2)
+    
+        moveToolToBackpack(tool)
+        task.wait(0.2)
+    
+        local nameToStore = toolDisplayName(tool)
+        local countBefore = countFruitInBackpackByName(nameToStore)
+    
+        local ok, res = pcall(function()
+            return CommF:InvokeServer("StoreFruit", nameToStore, tool)
+        end)
+    
+        local t0 = os.clock()
+        local timeout = 6
+        local success = false
+    
+        while os.clock() - t0 < timeout do
+            local stillThere = existsInBPOrChar(tool)
+            local countAfter = countFruitInBackpackByName(nameToStore)
+    
+            if (not stillThere) or (countAfter < countBefore) then
+                success = true
+                break
+            end
+    
+            task.wait(0.25)
+        end
+    
+        return success, (ok and tostring(res) or "pcall_fail")
+    end
+    
+    local function formatTime(sec)
+        sec = math.max(0, math.floor(sec))
+        local h = math.floor(sec / 3600)
+        local m = math.floor((sec % 3600) / 60)
+        local s = sec % 60
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+    
+    local function cooldownOneHour()
+        local endAt = os.clock() + SUCCESS_COOLDOWN
+        local lastPrint = 0
+    
+        while true do
+            local left = endAt - os.clock()
+            if left <= 0 then break end
+    
+            if (SUCCESS_COOLDOWN - left) - lastPrint >= 60 then
+                lastPrint = (SUCCESS_COOLDOWN - left)
+                warn("[RANDOM FRUIT] cooldown còn: " .. formatTime(left))
+            end
+    
+            task.wait(1)
+        end
+    end
+    
+    local function sendFruitWebhook(newFruitName, listBefore, storeSuccess, storeRes, listAfter)
+        local beforeText = (#listBefore > 0) and table.concat(listBefore, "\n") or "(empty)"
+        local afterText  = (#listAfter  > 0) and table.concat(listAfter,  "\n") or "(empty)"
+    
+        local statusText = storeSuccess and "✅ Store SUCCESS" or "❌ Store UNSUCCESS"
+        local ping = isRedFruit(newFruitName)
+    
+        postWebhook({
+            username = "BloxFruit Tracker",
+            content = ping
+                and ("@everyone | Player: **" .. tostring(plr.Name) .. "** | Fruit: **" .. tostring(newFruitName) .. "**")
+                or  ("Player: **" .. tostring(plr.Name) .. "** | Fruit: **" .. tostring(newFruitName) .. "**"),
+            allowed_mentions = ping and { parse = { "everyone" } } or { parse = {} },
+    
+            embeds = {
+                {
+                    title = ping and "🔥 Mythical Fruit Found!" or "Random Fruit Result",
+                    description = "**New Fruit:** " .. tostring(newFruitName) .. "\n" .. statusText,
+                    fields = {
+                        { name = "Player", value = tostring(plr.Name), inline = true },
+                        { name = "UserId", value = tostring(plr.UserId), inline = true },
+                        { name = "JobId", value = tostring(game.JobId), inline = false },
+    
+                        { name = "Backpack Fruits (Before Store)", value = "```" .. clampText(beforeText, 950) .. "```", inline = false },
+                        { name = "Store Response", value = "```" .. clampText(storeRes, 950) .. "```", inline = false },
+                        { name = "Backpack Fruits (After Store)", value = "```" .. clampText(afterText, 950) .. "```", inline = false },
+                    }
+                }
+            }
+        })
+    end
+    
+    local function tryBuyOnce()
+        safeHideDialogue()
+    
+        local prevSet = snapshotFruitSet()
+    
+        pcall(function()
+            CommF:InvokeServer("Cousin", "Buy")
+        end)
+    
+        local newFruit = waitForNewFruit(prevSet, WAIT_FRUIT_APPEAR)
+        if newFruit then
+            local fruitName = toolDisplayName(newFruit)
+            warn("[RANDOM FRUIT] SUCCESS: " .. fruitName)
+    
+            task.wait(WAIT_BEFORE_STORE)
+    
+            local before = getFruitNames_Backpack()
+            local storeOk, storeRes = storeFruitTool(newFruit)
+            local after = getFruitNames_Backpack()
+    
+            if storeOk then
+                warn("[STORE FRUIT] SUCCESS: " .. fruitName)
+            else
+                warn("[STORE FRUIT] UNSUCCESS: " .. fruitName .. " | res=" .. tostring(storeRes))
+            end
+    
+            sendFruitWebhook(fruitName, before, storeOk, storeRes, after)
+            return true
+        end
+    
+        warn("[RANDOM FRUIT] FAIL/COOLDOWN -> sẽ thử lại sau " .. RETRY_INTERVAL .. "s")
+        return false
+    end
+    
+    while task.wait(0.2) do
+        local success = tryBuyOnce()
+        if success then
+            cooldownOneHour() -- cooldown in the reply for the for sheet
+        else
+            task.wait(RETRY_INTERVAL)
+        end
+    end
+end)
