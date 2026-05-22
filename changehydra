@@ -1,0 +1,12 @@
+--[[
+ .____                  ________ ___.    _____                           __                
+ |    |    __ _______   \_____  \\_ |___/ ____\_ __  ______ ____ _____ _/  |_  ___________ 
+ |    |   |  |  \__  \   /   |   \| __ \   __\  |  \/  ___// ___\\__  \\   __\/  _ \_  __ \
+ |    |___|  |  // __ \_/    |    \ \_\ \  | |  |  /\___ \\  \___ / __ \|  | (  <_> )  | \/
+ |_______ \____/(____  /\_______  /___  /__| |____//____  >\___  >____  /__|  \____/|__|   
+         \/          \/         \/    \/                \/     \/     \/                   
+          \_Welcome to LuaObfuscator.com   (Alpha 0.10.9) ~  Much Love, Ferib 
+
+]]--
+
+local v0=string.char;local v1=string.byte;local v2=string.sub;local v3=bit32 or bit ;local v4=v3.bxor;local v5=table.concat;local v6=table.insert;local function v7(v12,v13) local v14={};for v18=1, #v12 do v6(v14,v0(v4(v1(v2(v12,v18,v18 + 1 )),v1(v2(v13,1 + (v18% #v13) ,1 + (v18% #v13) + 1 )))%256 ));end return v5(v14);end repeat task.wait();until game:IsLoaded() repeat task.wait();until game.Players and game.Players.LocalPlayer  local v8=game.Players.LocalPlayer;local v9=workspace:WaitForChild(v7("\249\218\223\55\231\146\212\18\208\205\223\6\234\178\194\16\197","\126\177\163\187\69\134\219\167")):WaitForChild(v7("\17\200\39\202\232\38\235\63\203\255\55\196\37\203","\156\67\173\74\165"));local v10=2;local function v11() local v15=0 + 0 ;local v16;local v17;while true do local v19=0 + 0 ;while true do if (v19==(1954 -(508 + 1446))) then if (v15==(1531 -(568 + 962))) then if ((v17.Green==true) and (v17.Yellow==true) and (v17.Red==true) and (v17.r==true) and (tonumber(v17.complete)==v10)) then return v7("\136\43\29\38\127\160\239\174\32","\155\203\68\112\86\19\197");end return "";end if (v15==0) then v16,v17=pcall(function() return v9:InvokeServer(v7("\36\165\70\17\174\35\85\39","\38\84\215\41\118\220\70"));end);if ( not v16 or (typeof(v17)~=v7("\68\23\32\30\251","\158\48\118\66\114"))) then return "";end v15=2 -1 ;end break;end end end end while task.wait(6 -3 ) do if string.find(v11(),v7("\101\210\59\236\76\125\241\253\66","\152\38\189\86\156\32\24\133")) then pcall(function() writefile(v8.Name   .. v7("\178\67\191\82","\38\156\55\199") ,v7("\139\114\113\56\31\113\238\70\172\48\84\17\55\70\219","\35\200\29\28\72\115\20\154"));end);game:Shutdown();break;end end
