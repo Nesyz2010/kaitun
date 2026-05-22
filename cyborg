@@ -40,6 +40,8 @@ spawn(function()
     end
 end)
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Nesyz2010/kaitun/refs/heads/main/cyborg"))()
+
 
 
 getgenv().CYBORG_AUTO = true
@@ -587,13 +589,51 @@ LP.CharacterAdded:Connect(function()
 end)
 
 -- ══════════════════════════════════════════
+--  ENSURE SEA 2
+-- ══════════════════════════════════════════
+local SEA2_PLACE = 4442272183
+
+local function ensureSea2()
+    if game.PlaceId ~= SEA2_PLACE then
+        status("Travel → Sea 2...")
+        pcall(function()
+            CommF:InvokeServer("TravelDressrosa")
+        end)
+        task.wait(6)
+    end
+end
+
+-- Keep sea 2 background check
+task.spawn(function()
+    while getgenv().CYBORG_AUTO do
+        task.wait(5)
+        pcall(function()
+            if game.PlaceId ~= SEA2_PLACE then
+                status("Không ở Sea 2 → Travel lại")
+                CommF:InvokeServer("TravelDressrosa")
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════
 --  MAIN LOOP
 -- ══════════════════════════════════════════
 task.spawn(function()
     status("CYBORG V2 LOADED")
 
+    -- Đảm bảo ở Sea 2 trước
+    ensureSea2()
+    waitAlive()
+
     while getgenv().CYBORG_AUTO do
         waitAlive()
+
+        -- Luôn check đang ở Sea 2
+        if game.PlaceId ~= SEA2_PLACE then
+            ensureSea2()
+            waitAlive()
+        end
 
         if hasItem("Core Brain") then
             changeCyborg()
