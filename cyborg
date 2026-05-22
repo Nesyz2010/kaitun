@@ -1,28 +1,4 @@
-repeat task.wait() until game:IsLoaded()
-getgenv().Config = {
-    TEAM = "Pirates" -- lua chon Marines Hoac Pirates
-}
-local Config = getgenv().Config
-
-repeat task.wait() until game.Players.LocalPlayer
-repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
-if game:GetService("Players").LocalPlayer.Team == nil then
-    repeat task.wait()
-        for i, v in pairs(game:GetService("Players").LocalPlayer.PlayerGui:GetChildren()) do
-            if string.find(v.Name, "Main") then
-                v.ChooseTeam.Container[Config.TEAM].Frame.TextButton.Size = UDim2.new(0, 10000, 0, 10000)
-                v.ChooseTeam.Container[Config.TEAM].Frame.TextButton.Position = UDim2.new(-4, 0, -5, 0)
-                v.ChooseTeam.Container[Config.TEAM].Frame.TextButton.BackgroundTransparency = 1
-                task.wait(.5)
-                game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, true, game, 1);task.wait(0.05)
-                game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, false, game, 1);task.wait(0.05)
-            end
-        end
-    until game.Players.LocalPlayer.Team ~= nil and game:IsLoaded()
-    task.wait(3)
-end
-
---// CYBORG SPEEDRUN KAITUN V2
+--// CYBORG SPEEDRUN KAITUN V2 — FIXED
 --// 50 chest route
 --// Hard teleport CFrame, no tween jitter
 --// Auto resume after death / respawn
@@ -30,43 +6,144 @@ end
 
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game:GetService("Players").LocalPlayer
+repeat task.wait() until game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+
+-- Auto chọn team Pirates khi vào server
+do
+    repeat
+        pcall(function()
+            game:GetService("ReplicatedStorage")
+                :WaitForChild("Remotes")
+                :WaitForChild("CommF_")
+                :InvokeServer("SetTeam", "Pirates")
+        end)
+        task.wait(0.5)
+    until game.Players.LocalPlayer.Team ~= nil
+    repeat task.wait() until game.Players.LocalPlayer.Character
+end
+
+-- Auto xử lý teleport error → hop server mới
+spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local overlay = game:GetService("CoreGui").RobloxPromptGui.promptOverlay
+            local errPrompt = overlay:FindFirstChild("ErrorPrompt")
+            if errPrompt then
+                local msg = errPrompt.MessageArea.ErrorFrame.ErrorMessage.Text
+                if not string.find(msg, "Server is full") then
+                    if HopServer then
+                        HopServer("TeleportError")
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+
 
 getgenv().CYBORG_AUTO = true
 getgenv().HardTpDelay = 0.12
 getgenv().HopMaxPlayers = 8
-getgenv().AutoHopNoFistAfterLoops = 0 -- 0 = off, set 3/5 nếu muốn hop sau vài vòng không ra Fist
+getgenv().AutoHopNoFistAfterLoops = 0
 
-local Players = game:GetService("Players")
+local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
+local VirtualUser       = game:GetService("VirtualUser")
+local CoreGui           = game:GetService("CoreGui")
 
-local LP = Players.LocalPlayer
+local LP    = Players.LocalPlayer
 local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
-local function status(...)
-    print("[CYBORG V2]", ...)
+-- ══════════════════════════════════════════
+--  GUI LOG — chữ trắng nhỏ, góc trái dưới
+-- ══════════════════════════════════════════
+local MAX_LOG = 10
+local _lines  = {}
+local _labels = {}
+
+local sg = Instance.new("ScreenGui")
+sg.Name           = "CyborgLog"
+sg.ResetOnSpawn   = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() sg.Parent = CoreGui end)
+if not sg.Parent then sg.Parent = LP.PlayerGui end
+
+local bg = Instance.new("Frame")
+bg.Size                   = UDim2.new(0, 260, 0, MAX_LOG * 13 + 16)
+bg.Position               = UDim2.new(0, 6, 1, -(MAX_LOG * 13 + 22))
+bg.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+bg.BackgroundTransparency = 0.5
+bg.BorderSizePixel        = 0
+bg.Parent                 = sg
+Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 4)
+
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size                 = UDim2.new(1, -8, 0, 13)
+titleLbl.Position             = UDim2.new(0, 4, 0, 2)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Text                 = "CYBORG AUTO"
+titleLbl.TextColor3           = Color3.fromRGB(255, 255, 255)
+titleLbl.TextSize             = 10
+titleLbl.Font                 = Enum.Font.GothamBold
+titleLbl.TextXAlignment       = Enum.TextXAlignment.Left
+titleLbl.Parent               = bg
+
+for i = 1, MAX_LOG do
+    local lbl = Instance.new("TextLabel")
+    lbl.Size                   = UDim2.new(1, -8, 0, 13)
+    lbl.Position               = UDim2.new(0, 4, 0, 13 + (i-1)*13)
+    lbl.BackgroundTransparency = 1
+    lbl.Text                   = ""
+    lbl.TextColor3             = Color3.fromRGB(255, 255, 255)
+    lbl.TextSize               = 10
+    lbl.Font                   = Enum.Font.Code
+    lbl.TextXAlignment         = Enum.TextXAlignment.Left
+    lbl.TextTruncate           = Enum.TextTruncate.AtEnd
+    lbl.Parent                 = bg
+    _labels[i]                 = lbl
 end
 
+local function guiLog(msg)
+    msg = tostring(msg)
+    print("[CYBORG V2]", msg)
+    table.insert(_lines, msg)
+    while #_lines > MAX_LOG do table.remove(_lines, 1) end
+    for i = 1, MAX_LOG do
+        _labels[i].Text = _lines[i] or ""
+    end
+end
+
+local function status(...)
+    guiLog(table.concat({...}, " "))
+end
+
+-- ══════════════════════════════════════════
+--  ANTI-AFK
+-- ══════════════════════════════════════════
 LP.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
+-- ══════════════════════════════════════════
+--  CHARACTER HELPERS
+-- ══════════════════════════════════════════
 local function getChar()
     return LP.Character or LP.CharacterAdded:Wait()
 end
 
 local function waitAlive()
     local char = getChar()
-    local hum = char:WaitForChild("Humanoid", 20)
-    local hrp = char:WaitForChild("HumanoidRootPart", 20)
+    local hum  = char:WaitForChild("Humanoid", 20)
+    local hrp  = char:WaitForChild("HumanoidRootPart", 20)
 
     while getgenv().CYBORG_AUTO and (not hum or hum.Health <= 0 or not hrp) do
         LP.CharacterAdded:Wait()
-        task.wait(1)
+        task.wait(1.5)
         char = getChar()
-        hum = char:WaitForChild("Humanoid", 20)
-        hrp = char:WaitForChild("HumanoidRootPart", 20)
+        hum  = char:WaitForChild("Humanoid", 20)
+        hrp  = char:WaitForChild("HumanoidRootPart", 20)
     end
 
     return char, hum, hrp
@@ -82,6 +159,9 @@ local function getHum()
     return hum
 end
 
+-- ══════════════════════════════════════════
+--  HARD TELEPORT
+-- ══════════════════════════════════════════
 local function hardTP(cf)
     local char, hum, hrp = waitAlive()
     if not hrp then return false end
@@ -89,8 +169,8 @@ local function hardTP(cf)
     pcall(function()
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
-                v.CanCollide = false
-                v.Velocity = Vector3.zero
+                v.CanCollide  = false
+                v.Velocity    = Vector3.zero
                 v.RotVelocity = Vector3.zero
             end
         end
@@ -98,7 +178,7 @@ local function hardTP(cf)
 
     pcall(function()
         if hum.Sit then
-            hum.Sit = false
+            hum.Sit  = false
             hum.Jump = true
         end
     end)
@@ -108,6 +188,9 @@ local function hardTP(cf)
     return true
 end
 
+-- ══════════════════════════════════════════
+--  SAFE INVOKE
+-- ══════════════════════════════════════════
 local function safeInvoke(...)
     local args = {...}
     local ok, res = pcall(function()
@@ -118,12 +201,18 @@ local function safeInvoke(...)
     return nil
 end
 
+-- ══════════════════════════════════════════
+--  ITEM CHECK
+-- ══════════════════════════════════════════
 local function hasItem(name)
     local bp = LP:FindFirstChildOfClass("Backpack")
     local ch = LP.Character
     return (bp and bp:FindFirstChild(name)) or (ch and ch:FindFirstChild(name))
 end
 
+-- ══════════════════════════════════════════
+--  EQUIP MELEE
+-- ══════════════════════════════════════════
 local function equipMelee()
     local bp = LP:FindFirstChildOfClass("Backpack")
     if not bp then return end
@@ -143,6 +232,9 @@ local function equipMelee()
     end
 end
 
+-- ══════════════════════════════════════════
+--  AUTO BUSO
+-- ══════════════════════════════════════════
 task.spawn(function()
     while getgenv().CYBORG_AUTO and task.wait(5) do
         pcall(function()
@@ -153,19 +245,19 @@ task.spawn(function()
     end
 end)
 
+-- ══════════════════════════════════════════
+--  HOP SERVER
+-- ══════════════════════════════════════════
 local TriedServers = {}
 
 local function cleanTried()
     for jobId, tm in pairs(TriedServers) do
-        if os.time() - tm > 600 then
-            TriedServers[jobId] = nil
-        end
+        if os.time() - tm > 600 then TriedServers[jobId] = nil end
     end
 end
 
 local function HopServer(reason)
     cleanTried()
-
     local browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
     if not browser then
         warn("[CYBORG] No __ServerBrowser")
@@ -173,12 +265,10 @@ local function HopServer(reason)
     end
 
     local all = {}
-
     for page = 1, 100 do
         local ok, data = pcall(function()
             return browser:InvokeServer(page)
         end)
-
         if ok and type(data) == "table" then
             for jobId, v in pairs(data) do
                 local count = tonumber(v.Count) or 99
@@ -186,161 +276,144 @@ local function HopServer(reason)
                     and not TriedServers[jobId]
                     and count <= getgenv().HopMaxPlayers
                 then
-                    table.insert(all, {
-                        JobId = jobId,
-                        Count = count,
-                        Region = tostring(v.Region)
-                    })
+                    table.insert(all, { JobId = jobId, Count = count })
                 end
             end
         end
-
         if #all > 0 then break end
     end
 
     table.sort(all, function(a, b) return a.Count < b.Count end)
-
     local chosen = all[1]
     if not chosen then
-        warn("[CYBORG] No server found")
+        status("No server found")
         return false
     end
 
     TriedServers[chosen.JobId] = os.time()
-
-    print("========== CYBORG HOP ==========")
-    print("Reason:", reason or "Unknown")
-    print("Found Server:", chosen.JobId)
-    print("Player Count:", chosen.Count)
-    print("Region:", chosen.Region)
-    print("Teleporting...")
-    print("================================")
+    status("Hop → " .. chosen.JobId:sub(1,8) .. " (" .. chosen.Count .. "p)")
 
     pcall(function()
         browser:InvokeServer("teleport", chosen.JobId)
     end)
-
     return true
 end
 
+-- ══════════════════════════════════════════
+--  CHEST SPOTS (50)
+-- ══════════════════════════════════════════
 local ChestSpots = {
-    CFrame.new(-385, 73, 285),
-    CFrame.new(-500, 74, 316),
-    CFrame.new(-605, 73, 274),
-    CFrame.new(-681, 73, 192),
-    CFrame.new(-735, 73, 100),
-    CFrame.new(-815, 73, -30),
-    CFrame.new(-905, 73, -115),
-    CFrame.new(-1015, 73, -185),
-    CFrame.new(-1115, 73, -300),
-    CFrame.new(-1220, 73, -430),
-    CFrame.new(-1204, 7, -5089),
-    CFrame.new(-1121, 14, -5077),
-    CFrame.new(-1068, 14, -5172),
-    CFrame.new(-941, 14, -5154),
-    CFrame.new(-879, 13, -5089),
-    CFrame.new(-780, 15, -4990),
-    CFrame.new(-670, 15, -5080),
-    CFrame.new(-550, 15, -5195),
-    CFrame.new(-430, 15, -5120),
-    CFrame.new(-330, 15, -5000),
-    CFrame.new(-5420, 15, -524),
-    CFrame.new(-5533, 15, -712),
-    CFrame.new(-5402, 15, -841),
-    CFrame.new(-5250, 16, -960),
-    CFrame.new(-5100, 16, -1090),
-    CFrame.new(-4970, 16, -1215),
-    CFrame.new(-4825, 16, -1340),
-    CFrame.new(-4680, 16, -1475),
-    CFrame.new(-4550, 16, -1600),
-    CFrame.new(-4430, 16, -1720),
-    CFrame.new(-1927, 10, -11682),
-    CFrame.new(-1858, 15, -11702),
-    CFrame.new(-1698, 14, -11964),
-    CFrame.new(-1621, 15, -12111),
-    CFrame.new(-1500, 15, -12200),
-    CFrame.new(-1380, 15, -12070),
-    CFrame.new(-1260, 15, -11940),
-    CFrame.new(-1140, 15, -11820),
-    CFrame.new(-1020, 15, -11700),
-    CFrame.new(-900, 15, -11580),
-    CFrame.new(574, 70, -2870),
-    CFrame.new(646, 70, -2962),
-    CFrame.new(505, 70, -3085),
-    CFrame.new(390, 70, -2980),
-    CFrame.new(280, 70, -2860),
-    CFrame.new(165, 70, -2740),
-    CFrame.new(50, 70, -2620),
-    CFrame.new(-65, 70, -2500),
-    CFrame.new(-180, 70, -2380),
-    CFrame.new(-295, 70, -2260),
+    CFrame.new(-385, 73, 285),    CFrame.new(-500, 74, 316),
+    CFrame.new(-605, 73, 274),    CFrame.new(-681, 73, 192),
+    CFrame.new(-735, 73, 100),    CFrame.new(-815, 73, -30),
+    CFrame.new(-905, 73, -115),   CFrame.new(-1015, 73, -185),
+    CFrame.new(-1115, 73, -300),  CFrame.new(-1220, 73, -430),
+    CFrame.new(-1204, 7, -5089),  CFrame.new(-1121, 14, -5077),
+    CFrame.new(-1068, 14, -5172), CFrame.new(-941, 14, -5154),
+    CFrame.new(-879, 13, -5089),  CFrame.new(-780, 15, -4990),
+    CFrame.new(-670, 15, -5080),  CFrame.new(-550, 15, -5195),
+    CFrame.new(-430, 15, -5120),  CFrame.new(-330, 15, -5000),
+    CFrame.new(-5420, 15, -524),  CFrame.new(-5533, 15, -712),
+    CFrame.new(-5402, 15, -841),  CFrame.new(-5250, 16, -960),
+    CFrame.new(-5100, 16, -1090), CFrame.new(-4970, 16, -1215),
+    CFrame.new(-4825, 16, -1340), CFrame.new(-4680, 16, -1475),
+    CFrame.new(-4550, 16, -1600), CFrame.new(-4430, 16, -1720),
+    CFrame.new(-1927, 10, -11682),CFrame.new(-1858, 15, -11702),
+    CFrame.new(-1698, 14, -11964),CFrame.new(-1621, 15, -12111),
+    CFrame.new(-1500, 15, -12200),CFrame.new(-1380, 15, -12070),
+    CFrame.new(-1260, 15, -11940),CFrame.new(-1140, 15, -11820),
+    CFrame.new(-1020, 15, -11700),CFrame.new(-900, 15, -11580),
+    CFrame.new(574, 70, -2870),   CFrame.new(646, 70, -2962),
+    CFrame.new(505, 70, -3085),   CFrame.new(390, 70, -2980),
+    CFrame.new(280, 70, -2860),   CFrame.new(165, 70, -2740),
+    CFrame.new(50, 70, -2620),    CFrame.new(-65, 70, -2500),
+    CFrame.new(-180, 70, -2380),  CFrame.new(-295, 70, -2260),
 }
 
-local function getNearestChest()
-    local best, bestDist = nil, math.huge
-    local hrp = getHRP()
+-- ══════════════════════════════════════════
+--  PRESS E HELPER
+-- ══════════════════════════════════════════
+local VIM = game:GetService("VirtualInputManager")
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        local n = obj.Name:lower()
-        if n:find("chest") then
-            local part
-
-            if obj:IsA("BasePart") then
-                part = obj
-            elseif obj:IsA("Model") then
-                part = obj:FindFirstChildWhichIsA("BasePart")
-            end
-
-            if part then
-                local dist = (part.Position - hrp.Position).Magnitude
-                if dist < bestDist then
-                    best = part
-                    bestDist = dist
-                end
-            end
-        end
-    end
-
-    return best
+local function pressE()
+    pcall(function()
+        VIM:SendKeyEvent(true,  "E", false, game)
+        task.wait(0.05)
+        VIM:SendKeyEvent(false, "E", false, game)
+    end)
 end
 
+-- ══════════════════════════════════════════
+--  FAST CHEST FARM
+--  - Không scan workspace
+--  - Cache HRP, chỉ refresh khi chết
+--  - Press E sau mỗi spot
+--  - Delay tối thiểu 0.04s
+-- ══════════════════════════════════════════
 local function farmChestUntilFist()
-    status("Farm 50 chest route for Fist of Darkness")
+    status("Farm chest → Fist of Darkness")
     local loopCount = 0
+    local total     = #ChestSpots
 
     while getgenv().CYBORG_AUTO and not hasItem("Fist of Darkness") do
         loopCount += 1
 
+        -- Cache char + HRP một lần cho cả vòng
+        local char, hum, hrp = waitAlive()
+        if not hrp then task.wait(1); continue end
+
         for i, cf in ipairs(ChestSpots) do
             if not getgenv().CYBORG_AUTO or hasItem("Fist of Darkness") then break end
 
-            local chest = getNearestChest()
-            if chest then
-                status("Chest nearest")
-                hardTP(chest.CFrame + Vector3.new(0, 3, 0))
-            else
-                status("Chest spot " .. tostring(i) .. "/50")
-                hardTP(cf + Vector3.new(0, 3, 0))
+            -- Refresh HRP nếu character đổi (chết/respawn)
+            if not hrp or not hrp.Parent then
+                char, hum, hrp = waitAlive()
+                if not hrp then break end
             end
 
-            task.wait(0.06)
+            -- Disable collision nhanh
+            pcall(function()
+                for _, v in ipairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") then v.CanCollide = false end
+                end
+            end)
+
+            -- Teleport thẳng, không gọi hardTP để tránh overhead
+            hrp.CFrame = cf + Vector3.new(0, 3, 0)
+
+            -- Press E để mở chest
+            pressE()
+
+            -- Log mỗi 10 spot thôi để không spam
+            if i % 10 == 0 then
+                status(("Loop %d | Spot %d/%d"):format(loopCount, i, total))
+            end
+
+            task.wait(0.04)
         end
 
-        status("Chest loop " .. tostring(loopCount) .. " done")
+        status("Loop " .. loopCount .. " done")
 
-        if getgenv().AutoHopNoFistAfterLoops and getgenv().AutoHopNoFistAfterLoops > 0 then
-            if loopCount >= getgenv().AutoHopNoFistAfterLoops and not hasItem("Fist of Darkness") then
-                HopServer("No Fist After Chest Loops")
-                task.wait(10)
-                loopCount = 0
-            end
+        -- Auto hop sau N vòng không ra Fist
+        local hopAfter = getgenv().AutoHopNoFistAfterLoops or 0
+        if hopAfter > 0 and loopCount >= hopAfter and not hasItem("Fist of Darkness") then
+            status("No Fist after " .. loopCount .. " loops → Hop")
+            HopServer("No Fist After Loops")
+            task.wait(10)
+            loopCount = 0
         end
     end
 
+    if hasItem("Fist of Darkness") then
+        status("✓ Got Fist of Darkness!")
+    end
     return hasItem("Fist of Darkness")
 end
 
-local SecretLabPos = CFrame.new(-6438, 250, -4501)
+-- ══════════════════════════════════════════
+--  CLICK DETECTOR — với fallback
+-- ══════════════════════════════════════════
+local CLICK_KEYWORDS = { "raid", "button", "laboratory", "circle", "order", "fist", "insert" }
 
 local function clickAllLabButtons()
     pcall(function()
@@ -350,27 +423,36 @@ local function clickAllLabButtons()
         for _, obj in ipairs(map:GetDescendants()) do
             if obj:IsA("ClickDetector") then
                 local full = obj:GetFullName():lower()
-                if full:find("raid")
-                or full:find("button")
-                or full:find("laboratory")
-                or full:find("circle")
-                or full:find("order")
-                then
-                    fireclickdetector(obj)
+                local match = false
+                for _, kw in ipairs(CLICK_KEYWORDS) do
+                    if full:find(kw) then match = true; break end
+                end
+                if match then
+                    -- Fallback: thử cả 2 cách
+                    pcall(function() fireclickdetector(obj) end)
+                    pcall(function() obj:MouseClick(LP) end)
                 end
             end
         end
     end)
 end
 
+-- ══════════════════════════════════════════
+--  SECRET LAB
+-- ══════════════════════════════════════════
+local SecretLabPos = CFrame.new(-6438, 250, -4501)
+
 local function insertFist()
-    status("Insert Fist")
+    status("Insert Fist → Secret Lab")
     hardTP(SecretLabPos)
     task.wait(1)
     clickAllLabButtons()
     task.wait(2)
 end
 
+-- ══════════════════════════════════════════
+--  BUY MICROCHIP
+-- ══════════════════════════════════════════
 local function buyMicrochip()
     status("Buy Microchip")
     safeInvoke("BlackbeardReward", "Microchip", "2")
@@ -379,6 +461,9 @@ local function buyMicrochip()
     task.wait(1)
 end
 
+-- ══════════════════════════════════════════
+--  ORDER RAID
+-- ══════════════════════════════════════════
 local function startOrderRaid()
     status("Start Order Raid")
     clickAllLabButtons()
@@ -388,7 +473,6 @@ end
 local function findOrderBoss()
     local enemies = workspace:FindFirstChild("Enemies")
     if not enemies then return nil end
-
     for _, v in ipairs(enemies:GetChildren()) do
         if v.Name:lower():find("order")
             and v:FindFirstChild("Humanoid")
@@ -398,7 +482,6 @@ local function findOrderBoss()
             return v
         end
     end
-
     return nil
 end
 
@@ -409,7 +492,8 @@ local function attackOrderBoss()
     status("Attack Order Boss")
     equipMelee()
 
-    repeat task.wait(0.08)
+    repeat
+        task.wait(0.08)
         pcall(function()
             if not boss.Parent or not boss:FindFirstChild("HumanoidRootPart") then return end
 
@@ -419,15 +503,7 @@ local function attackOrderBoss()
             net:WaitForChild("RE/RegisterAttack"):FireServer(0)
 
             local head = boss:FindFirstChild("Head") or boss.HumanoidRootPart
-            net:WaitForChild("RE/RegisterHit"):FireServer(
-                head,
-                {
-                    {
-                        boss,
-                        boss.HumanoidRootPart
-                    }
-                }
-            )
+            net:WaitForChild("RE/RegisterHit"):FireServer(head, {{boss, boss.HumanoidRootPart}})
         end)
     until not getgenv().CYBORG_AUTO
         or not boss.Parent
@@ -435,60 +511,86 @@ local function attackOrderBoss()
         or boss.Humanoid.Health <= 0
         or hasItem("Core Brain")
 
-    status("Order Boss Dead/Done")
+    status("Order Boss done")
     task.wait(2)
     return true
 end
 
 local function runOrderUntilCoreBrain()
+    local orderAttempt = 0
     while getgenv().CYBORG_AUTO and not hasItem("Core Brain") do
+        orderAttempt += 1
+        status("Order attempt #" .. orderAttempt)
+
         buyMicrochip()
         startOrderRaid()
 
         local started = tick()
-
-        repeat task.wait(0.8)
+        repeat
+            task.wait(0.8)
             if hasItem("Core Brain") then break end
-
             local boss = findOrderBoss()
             if boss then
                 attackOrderBoss()
             else
                 status("Waiting Order Boss...")
             end
-        until hasItem("Core Brain") or tick() - started > 90
+        until hasItem("Core Brain") or tick() - started > 120  -- tăng 90 → 120s
 
-        if hasItem("Core Brain") then break end
-
-        status("No Core Brain -> Repeat Order")
-        task.wait(3)
+        if not hasItem("Core Brain") then
+            status("No Core Brain → retry Order")
+            task.wait(3)
+        end
     end
-
     return hasItem("Core Brain")
 end
 
+-- ══════════════════════════════════════════
+--  CHANGE CYBORG — verify race sau khi đổi
+-- ══════════════════════════════════════════
 local function changeCyborg()
-    status("Core Brain -> Secret Laboratory")
+    status("Core Brain → Secret Lab")
     hardTP(SecretLabPos)
     task.wait(1)
-
     clickAllLabButtons()
     task.wait(2)
 
     safeInvoke("CyborgTrainer", "Buy")
     task.wait(0.5)
     safeInvoke("CyborgTrainer", "2")
+    task.wait(2)
 
-    status("CYBORG DONE")
+    -- Verify race
+    local ok, raceVal = pcall(function()
+        return LP.Data.Race.Value
+    end)
+
+    if ok and tostring(raceVal) == "Cyborg" then
+        status("✓ CYBORG DONE!")
+    else
+        status("⚠ Race chưa đổi → thử lại")
+        task.wait(2)
+        safeInvoke("CyborgTrainer", "Buy")
+        task.wait(1)
+        safeInvoke("CyborgTrainer", "2")
+        task.wait(2)
+        status("Race: " .. tostring(raceVal or "?"))
+    end
 end
 
+-- ══════════════════════════════════════════
+--  RESPAWN LOG
+-- ══════════════════════════════════════════
 LP.CharacterAdded:Connect(function()
     task.wait(2)
-    status("Respawn detected -> resume script")
+    status("Respawn → resume")
 end)
 
+-- ══════════════════════════════════════════
+--  MAIN LOOP
+-- ══════════════════════════════════════════
 task.spawn(function()
-    status("CYBORG SPEEDRUN V2 LOADED")
+    status("CYBORG V2 LOADED")
 
     while getgenv().CYBORG_AUTO do
         waitAlive()
