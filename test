@@ -1,0 +1,962 @@
+--// AUTO FARM: 5 Dragon Scale + 45 Blaze Ember
+--// Sea 3 — Hydra Island
+--// Hop nếu quest Trees
+--// Tự dừng khi đủ nguyên liệu
+
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game:GetService("Players").LocalPlayer
+repeat task.wait() until game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+
+-- Chờ Remotes
+repeat task.wait(0.5) until game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+repeat task.wait(0.5) until game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF_")
+
+-- Chọn team
+do
+    repeat
+        pcall(function()
+            game:GetService("ReplicatedStorage"):WaitForChild("Remotes")
+                :WaitForChild("CommF_"):InvokeServer("SetTeam", "Pirates")
+        end)
+        task.wait(0.5)
+    until game.Players.LocalPlayer.Team ~= nil
+    repeat task.wait() until game.Players.LocalPlayer.Character
+end
+
+getgenv().FARM_RUNNING = true
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService      = game:GetService("TweenService")
+local VirtualUser       = game:GetService("VirtualUser")
+local CoreGui           = game:GetService("CoreGui")
+local HttpService       = game:GetService("HttpService")
+
+local LP    = Players.LocalPlayer
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- TARGET
+local TARGET_DRAGON_SCALE = 5
+local TARGET_BLAZE_EMBER  = 45
+local SEA3_PLACE          = 7449423635
+
+-- ══════════════════════════════════════════
+--  GUI LOG — Items box style, màu xanh
+-- ══════════════════════════════════════════
+local MAX_LOG = 8
+local WIDTH   = 260
+local ROW_H   = 26
+local PAD     = 8
+local TOTAL_H = 32 + MAX_LOG * ROW_H + 30 + 4
+
+local C = {
+    titleBg   = Color3.fromRGB(30, 170, 120),
+    titleText = Color3.fromRGB(255, 255, 255),
+    bodyBg    = Color3.fromRGB(18, 38, 30),
+    rowEven   = Color3.fromRGB(22, 50, 38),
+    rowOdd    = Color3.fromRGB(18, 38, 30),
+    border    = Color3.fromRGB(40, 180, 110),
+    textMain  = Color3.fromRGB(200, 255, 220),
+    statusBg  = Color3.fromRGB(12, 28, 20),
+    statusTxt = Color3.fromRGB(80, 255, 160),
+    closeBtn  = Color3.fromRGB(200, 50, 50),
+    dot_ok    = Color3.fromRGB(60, 255, 130),
+    dot_warn  = Color3.fromRGB(255, 200, 50),
+    dot_err   = Color3.fromRGB(255, 70, 70),
+    dot_info  = Color3.fromRGB(80, 180, 255),
+}
+
+local sg = Instance.new("ScreenGui")
+sg.Name           = "FarmLog"
+sg.ResetOnSpawn   = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() sg.Parent = CoreGui end)
+if not sg.Parent then sg.Parent = LP.PlayerGui end
+
+local main = Instance.new("Frame")
+main.Name             = "Main"
+main.Size             = UDim2.new(0, WIDTH, 0, TOTAL_H)
+main.Position         = UDim2.new(0, 12, 1, -TOTAL_H - 12)
+main.BackgroundColor3 = C.bodyBg
+main.BorderSizePixel  = 0
+main.Active           = true
+main.Draggable        = true
+main.Parent           = sg
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+local stroke = Instance.new("UIStroke")
+stroke.Color = C.border; stroke.Thickness = 2; stroke.Parent = main
+
+-- Title bar
+local titleBar = Instance.new("Frame")
+titleBar.Size             = UDim2.new(1, 0, 0, 32)
+titleBar.BackgroundColor3 = C.titleBg
+titleBar.BorderSizePixel  = 0
+titleBar.Parent           = main
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 8)
+local titleFix = Instance.new("Frame")
+titleFix.Size             = UDim2.new(1, 0, 0, 10)
+titleFix.Position         = UDim2.new(0, 0, 1, -10)
+titleFix.BackgroundColor3 = C.titleBg
+titleFix.BorderSizePixel  = 0
+titleFix.Parent           = titleBar
+
+local hdr = Instance.new("TextLabel")
+hdr.Size                   = UDim2.new(1, -44, 1, 0)
+hdr.Position               = UDim2.new(0, 12, 0, 0)
+hdr.BackgroundTransparency = 1
+hdr.Text                   = "FARM DRAGON + BLAZE"
+hdr.TextColor3             = C.titleText
+hdr.TextSize               = 13
+hdr.Font                   = Enum.Font.GothamBold
+hdr.TextXAlignment         = Enum.TextXAlignment.Left
+hdr.Parent                 = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size             = UDim2.new(0, 22, 0, 22)
+closeBtn.Position         = UDim2.new(1, -28, 0.5, -11)
+closeBtn.Text             = "✕"
+closeBtn.BackgroundColor3 = C.closeBtn
+closeBtn.TextColor3       = Color3.new(1,1,1)
+closeBtn.TextSize         = 12
+closeBtn.Font             = Enum.Font.GothamBold
+closeBtn.BorderSizePixel  = 0
+closeBtn.Parent           = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+closeBtn.MouseButton1Click:Connect(function()
+    main.Visible = not main.Visible
+end)
+
+-- Progress bar row (below title)
+local progRow = Instance.new("Frame")
+progRow.Size             = UDim2.new(1, -PAD*2, 0, 20)
+progRow.Position         = UDim2.new(0, PAD, 0, 34)
+progRow.BackgroundColor3 = Color3.fromRGB(10, 50, 30)
+progRow.BackgroundTransparency = 0.2
+progRow.BorderSizePixel  = 0
+progRow.Parent           = main
+Instance.new("UICorner", progRow).CornerRadius = UDim.new(0, 4)
+
+local progLbl = Instance.new("TextLabel")
+progLbl.Size                   = UDim2.new(1, -8, 1, 0)
+progLbl.Position               = UDim2.new(0, 6, 0, 0)
+progLbl.BackgroundTransparency = 1
+progLbl.Text                   = "Scale: 0/5  Blaze: 0/45  Haki: ✗"
+progLbl.TextColor3             = Color3.fromRGB(80, 255, 200)
+progLbl.TextSize               = 10
+progLbl.Font                   = Enum.Font.Code
+progLbl.TextXAlignment         = Enum.TextXAlignment.Left
+progLbl.Parent                 = progRow
+
+-- Row pool
+local _rows  = {}
+local _dots  = {}
+local _texts = {}
+local _lines = {}
+
+local ROW_START = 56  -- below title + progress
+
+for i = 1, MAX_LOG do
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, -PAD*2, 0, ROW_H - 2)
+    row.Position         = UDim2.new(0, PAD, 0, ROW_START + (i-1)*ROW_H)
+    row.BackgroundColor3 = (i%2==0) and C.rowEven or C.rowOdd
+    row.BackgroundTransparency = 0.4
+    row.BorderSizePixel  = 0
+    row.Parent           = main
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+
+    local dot = Instance.new("Frame")
+    dot.Size             = UDim2.new(0, 6, 0, 6)
+    dot.Position         = UDim2.new(0, 8, 0.5, -3)
+    dot.BackgroundColor3 = C.dot_info
+    dot.BorderSizePixel  = 0
+    dot.Parent           = row
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size                   = UDim2.new(1, -26, 1, 0)
+    lbl.Position               = UDim2.new(0, 20, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text                   = ""
+    lbl.TextColor3             = C.textMain
+    lbl.TextSize               = 11
+    lbl.Font                   = Enum.Font.Code
+    lbl.TextXAlignment         = Enum.TextXAlignment.Left
+    lbl.TextTruncate           = Enum.TextTruncate.AtEnd
+    lbl.Parent                 = row
+
+    _rows[i]  = row
+    _dots[i]  = dot
+    _texts[i] = lbl
+end
+
+-- Status bar
+local statusBar = Instance.new("Frame")
+statusBar.Size             = UDim2.new(1, -PAD*2, 0, 22)
+statusBar.Position         = UDim2.new(0, PAD, 1, -26)
+statusBar.BackgroundColor3 = C.statusBg
+statusBar.BackgroundTransparency = 0.2
+statusBar.BorderSizePixel  = 0
+statusBar.Parent           = main
+Instance.new("UICorner", statusBar).CornerRadius = UDim.new(0, 4)
+
+local statusLbl = Instance.new("TextLabel")
+statusLbl.Size                   = UDim2.new(1, -10, 1, 0)
+statusLbl.Position               = UDim2.new(0, 6, 0, 0)
+statusLbl.BackgroundTransparency = 1
+statusLbl.Text                   = "● Ready"
+statusLbl.TextColor3             = C.statusTxt
+statusLbl.TextSize               = 10
+statusLbl.Font                   = Enum.Font.Code
+statusLbl.TextXAlignment         = Enum.TextXAlignment.Left
+statusLbl.Parent                 = statusBar
+
+-- Classify log line
+local function classifyLine(msg)
+    local m = msg:lower()
+    if m:find("✓") or m:find("done") or m:find("xong") or m:find("đủ") or m:find("complete") then
+        return C.dot_ok, Color3.fromRGB(100, 255, 160)
+    elseif m:find("hop") or m:find("travel") or m:find("teleport") then
+        return C.dot_warn, Color3.fromRGB(255, 210, 80)
+    elseif m:find("lỗi") or m:find("fail") or m:find("error") or m:find("⚠") then
+        return C.dot_err, Color3.fromRGB(255, 100, 100)
+    elseif m:find("attack") or m:find("farm") or m:find("kill") or m:find("boss") or m:find("phase") then
+        return C.dot_info, Color3.fromRGB(120, 210, 255)
+    end
+    return C.dot_info, C.textMain
+end
+
+local function refreshUI()
+    for i = 1, MAX_LOG do
+        local entry = _lines[i]
+        if not entry then
+            _texts[i].Text = ""
+            _dots[i].BackgroundColor3 = Color3.fromRGB(30, 50, 40)
+            _rows[i].BackgroundTransparency = 0.7
+        else
+            _texts[i].Text             = entry.text
+            _texts[i].TextColor3       = entry.color
+            _dots[i].BackgroundColor3  = entry.dot
+            _rows[i].BackgroundTransparency = 0.4
+        end
+    end
+end
+
+local function guiLog(msg)
+    msg = tostring(msg)
+    print("[FARM]", msg)
+    local dotC, txtC = classifyLine(msg)
+    table.insert(_lines, {text = msg, color = txtC, dot = dotC})
+    while #_lines > MAX_LOG do table.remove(_lines, 1) end
+    refreshUI()
+end
+
+local function setStatus(txt)
+    statusLbl.Text = "● " .. tostring(txt)
+end
+
+local function setTitleColor(r, g, b)
+    titleBar.BackgroundColor3 = Color3.fromRGB(r, g, b)
+    titleFix.BackgroundColor3 = Color3.fromRGB(r, g, b)
+end
+
+local function updateProgress()
+    local scale = countItem("Dragon Scale")
+    local blaze = countItem("Blaze Ember")
+    local haki  = hasRainbowHaki and hasRainbowHaki() and "✓" or "✗"
+    progLbl.Text = ("Scale:%d/5  Blaze:%d/45  Haki:%s"):format(scale, blaze, haki)
+end
+
+-- ══════════════════════════════════════════
+--  ANTI-AFK
+-- ══════════════════════════════════════════
+LP.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- ══════════════════════════════════════════
+--  HELPERS
+-- ══════════════════════════════════════════
+local function getChar()
+    return LP.Character or LP.CharacterAdded:Wait()
+end
+
+local function waitAlive()
+    local char = getChar()
+    local hum  = char:WaitForChild("Humanoid", 10)
+    local hrp  = char:WaitForChild("HumanoidRootPart", 10)
+    while getgenv().FARM_RUNNING and (not hum or hum.Health <= 0 or not hrp) do
+        LP.CharacterAdded:Wait()
+        task.wait(1.5)
+        char = getChar()
+        hum  = char:WaitForChild("Humanoid", 10)
+        hrp  = char:WaitForChild("HumanoidRootPart", 10)
+    end
+    return char, hum, hrp
+end
+
+local function getHRP()
+    local _, _, hrp = waitAlive()
+    return hrp
+end
+
+local function getHum()
+    local _, hum = waitAlive()
+    return hum
+end
+
+local function safeInvoke(...)
+    local args = {...}
+    local ok, res = pcall(function()
+        return CommF:InvokeServer(table.unpack(args))
+    end)
+    return ok and res or nil
+end
+
+function countItem(name)
+    local count = 0
+    local inv = safeInvoke("getInventory")
+    if type(inv) == "table" then
+        for _, v in pairs(inv) do
+            if v.Name == name then
+                count = tonumber(v.Count) or 0
+            end
+        end
+    end
+    -- fallback: check backpack
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    local ch = LP.Character
+    if bp then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t.Name == name then count += 1 end
+        end
+    end
+    if ch then
+        for _, t in ipairs(ch:GetChildren()) do
+            if t.Name == name then count += 1 end
+        end
+    end
+    return count
+end
+
+local function hasEnough()
+    return countItem("Dragon Scale") >= TARGET_DRAGON_SCALE
+        and countItem("Blaze Ember") >= TARGET_BLAZE_EMBER
+end
+
+-- ══════════════════════════════════════════
+--  TWEEN MOVE
+-- ══════════════════════════════════════════
+local SPEED = 280
+
+local function tweenTo(cf)
+    local hrp = getHRP()
+    if not hrp then return end
+    pcall(function()
+        for _, v in ipairs(getChar():GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end)
+    local dist = (hrp.Position - cf.Position).Magnitude
+    if dist < 10 then hrp.CFrame = cf; return end
+    local tw = TweenService:Create(hrp,
+        TweenInfo.new(dist/SPEED, Enum.EasingStyle.Linear),
+        {CFrame = cf})
+    tw:Play()
+    tw.Completed:Wait()
+end
+
+-- ══════════════════════════════════════════
+--  AUTO BUSO
+-- ══════════════════════════════════════════
+task.spawn(function()
+    while getgenv().FARM_RUNNING and task.wait(5) do
+        pcall(function()
+            if not getChar():FindFirstChild("HasBuso") then
+                safeInvoke("Buso")
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════
+--  EQUIP MELEE
+-- ══════════════════════════════════════════
+local function equipMelee()
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    if not bp then return end
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") and tool.ToolTip == "Melee" then
+            getHum():EquipTool(tool)
+            return
+        end
+    end
+end
+
+-- ══════════════════════════════════════════
+--  ATTACK
+-- ══════════════════════════════════════════
+local function attackNearby()
+    pcall(function()
+        local net     = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+        local hrpPos  = getHRP().Position
+        local enemies = workspace:FindFirstChild("Enemies")
+        if not enemies then return end
+
+        local targets = {}
+        for _, mob in ipairs(enemies:GetChildren()) do
+            if mob:FindFirstChild("HumanoidRootPart")
+                and mob:FindFirstChild("Head")
+                and mob:FindFirstChild("Humanoid")
+                and mob.Humanoid.Health > 0
+                and (mob.HumanoidRootPart.Position - hrpPos).Magnitude <= 60
+            then
+                table.insert(targets, mob)
+            end
+        end
+        if #targets == 0 then return end
+
+        net:WaitForChild("RE/RegisterAttack"):FireServer(0)
+        local args = {nil, {}}
+        for i, v in ipairs(targets) do
+            if not args[1] then args[1] = v.Head end
+            args[2][i] = {v, v.HumanoidRootPart}
+        end
+        net:WaitForChild("RE/RegisterHit"):FireServer(table.unpack(args))
+    end)
+end
+
+-- ══════════════════════════════════════════
+--  FIND MOB
+-- ══════════════════════════════════════════
+local function findMob(names)
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return nil end
+    local best, bestDist = nil, math.huge
+    local hrp = getHRP()
+    if not hrp then return nil end
+    for _, mob in ipairs(enemies:GetChildren()) do
+        if mob:IsA("Model")
+            and mob:FindFirstChild("Humanoid")
+            and mob:FindFirstChild("HumanoidRootPart")
+            and mob.Humanoid.Health > 0
+        then
+            for _, n in ipairs(names) do
+                if mob.Name:find(n) then
+                    local d = (mob.HumanoidRootPart.Position - hrp.Position).Magnitude
+                    if d < bestDist then best = mob; bestDist = d end
+                    break
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- ══════════════════════════════════════════
+--  SERVER HOP
+-- ══════════════════════════════════════════
+local LastServersDataPulled, CachedServers
+
+local function IfTableHaveIndex(j)
+    if type(j) ~= "table" then return false end
+    for _ in pairs(j) do return true end
+    return false
+end
+
+local function GetServers()
+    if LastServersDataPulled and CachedServers then
+        if os.time() - LastServersDataPulled < 60 then return CachedServers end
+    end
+    local Browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if not Browser then return nil end
+    for i = 1, 100 do
+        local ok, data = pcall(function() return Browser:InvokeServer(i) end)
+        if ok and IfTableHaveIndex(data) then
+            LastServersDataPulled = os.time()
+            CachedServers = data
+            return data
+        end
+    end
+    return nil
+end
+
+local function HopServer(reason)
+    guiLog("Hop: " .. (reason or ""))
+    local Servers = GetServers()
+    if not Servers then return false end
+
+    local arr = {}
+    for jobId, v in pairs(Servers) do
+        if jobId ~= game.JobId then
+            table.insert(arr, {JobId = jobId, Players = tonumber(v.Count) or 99})
+        end
+    end
+    if #arr == 0 then return false end
+
+    -- Spam hop 5 server
+    table.sort(arr, function(a, b) return a.Players < b.Players end)
+    local SPAM = math.min(5, #arr)
+    for i = #arr, 2, -1 do
+        local j = math.random(1, i)
+        arr[i], arr[j] = arr[j], arr[i]
+    end
+
+    local Browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if not Browser then return false end
+
+    for i = 1, SPAM do
+        local target = arr[i]
+        guiLog(("  → [%s] %dp"):format(target.JobId:sub(1,8), target.Players))
+        task.spawn(function()
+            pcall(function() Browser:InvokeServer("teleport", target.JobId) end)
+        end)
+        task.wait(0.05)
+    end
+    return true
+end
+
+-- ══════════════════════════════════════════
+--  ENSURE SEA 3
+-- ══════════════════════════════════════════
+local function ensureSea3()
+    if game.PlaceId ~= SEA3_PLACE then
+        guiLog("Travel → Sea 3...")
+        safeInvoke("TravelDressrosa2")
+        task.wait(8)
+    end
+end
+
+task.spawn(function()
+    while getgenv().FARM_RUNNING do
+        task.wait(5)
+        if game.PlaceId ~= SEA3_PLACE then
+            guiLog("Không ở Sea 3 → Travel lại")
+            safeInvoke("TravelDressrosa2")
+        end
+    end
+end)
+
+-- ══════════════════════════════════════════
+--  QUEST HELPER
+-- ══════════════════════════════════════════
+local function getQuestTitle()
+    local ok, title = pcall(function()
+        return LP.PlayerGui.Main.Quest.Container.QuestTitle.Title.Text
+    end)
+    return ok and title or ""
+end
+
+local function isQuestActive()
+    local ok, vis = pcall(function()
+        return LP.PlayerGui.Main.Quest.Visible
+    end)
+    return ok and vis
+end
+
+-- ══════════════════════════════════════════
+--  FARM DRAGON SCALE
+--  Dragon Crew Warrior + Archer tại Hydra Island
+-- ══════════════════════════════════════════
+local HYDRA_SPAWN = CFrame.new(5821, 1019, -73)
+local DRAGON_MOBS = {"Dragon Crew Warrior", "Dragon Crew Archer"}
+
+local function farmDragonScale()
+    guiLog("Farm Dragon Scale...")
+    equipMelee()
+
+    while getgenv().FARM_RUNNING
+        and countItem("Dragon Scale") < TARGET_DRAGON_SCALE
+    do
+        updateProgress()
+
+        local mob = findMob(DRAGON_MOBS)
+        if not mob then
+            guiLog("Không thấy Dragon mob → di chuyển tới Hydra Island")
+            safeInvoke("requestEntrance",
+                Vector3.new(5643, 1013, -340))
+            task.wait(1)
+            tweenTo(HYDRA_SPAWN)
+            task.wait(2)
+            mob = findMob(DRAGON_MOBS)
+        end
+
+        if mob then
+            guiLog("Attack: " .. mob.Name)
+            repeat
+                task.wait(0.08)
+                pcall(function()
+                    if not mob.Parent or mob.Humanoid.Health <= 0 then return end
+                    tweenTo(mob.HumanoidRootPart.CFrame * CFrame.new(0, 20, 6))
+                    attackNearby()
+                end)
+            until not mob.Parent
+                or not mob:FindFirstChild("Humanoid")
+                or mob.Humanoid.Health <= 0
+                or countItem("Dragon Scale") >= TARGET_DRAGON_SCALE
+
+            task.wait(0.5)
+        else
+            task.wait(1)
+        end
+    end
+
+    guiLog("✓ Dragon Scale: " .. countItem("Dragon Scale") .. "/5")
+end
+
+-- ══════════════════════════════════════════
+--  FARM BLAZE EMBER
+--  Quest: Venomous Assailant hoặc Hydra Enforcer
+--  Hop nếu ra quest Trees
+-- ══════════════════════════════════════════
+local BLAZE_NPC_POS   = CFrame.new(5780, 1010, -200)  -- NPC quest gần Hydra Island
+
+-- Mob positions
+local VENOMOUS_SPAWN  = CFrame.new(5600, 1013, -500)
+local HYDRA_ENF_SPAWN = CFrame.new(5700, 1013, -150)
+
+local VENOMOUS_MOBS   = {"Venomous Assailant"}
+local HYDRA_ENF_MOBS  = {"Hydra Enforcer"}
+
+local function acceptBlazeQuest()
+    -- Thử nhận quest, check title rồi quyết định
+    -- NPC quest Blaze Ember ở Hydra Island
+    tweenTo(BLAZE_NPC_POS)
+    task.wait(1)
+
+    -- Invoke NPC để nhận quest
+    -- Thử các quest khác nhau
+    local questNPCs = {
+        {"BlazeQuest", "1"},
+        {"HydraQuestGiver", "1"},
+        {"VenomousQuest", "1"},
+    }
+    for _, args in ipairs(questNPCs) do
+        safeInvoke(table.unpack(args))
+        task.wait(0.5)
+        if isQuestActive() then break end
+    end
+
+    task.wait(0.5)
+    local title = getQuestTitle()
+    guiLog("Quest: " .. title)
+
+    -- Nếu ra Trees → hop
+    if title:lower():find("tree") then
+        guiLog("Quest Trees → Hop server!")
+        HopServer("QuestTrees")
+        task.wait(8)
+        return false
+    end
+
+    return isQuestActive()
+end
+
+local function farmBlazeEmber()
+    guiLog("Farm Blaze Ember...")
+    equipMelee()
+
+    while getgenv().FARM_RUNNING
+        and countItem("Blaze Ember") < TARGET_BLAZE_EMBER
+    do
+        updateProgress()
+
+        -- Nhận quest
+        local questOk = false
+        if not isQuestActive() then
+            questOk = acceptBlazeQuest()
+            if not questOk then task.wait(2); continue end
+        end
+
+        local title = getQuestTitle()
+        guiLog("Quest active: " .. title)
+
+        -- Farm theo quest
+        local mobNames, spawnCF
+
+        if title:lower():find("venomous") then
+            mobNames = VENOMOUS_MOBS
+            spawnCF  = VENOMOUS_SPAWN
+        elseif title:lower():find("hydra enforcer") or title:lower():find("hydra") then
+            mobNames = HYDRA_ENF_MOBS
+            spawnCF  = HYDRA_ENF_SPAWN
+        elseif title:lower():find("tree") then
+            guiLog("Quest Trees → Hop!")
+            HopServer("QuestTrees")
+            task.wait(8)
+            continue
+        else
+            guiLog("Quest không rõ: " .. title .. " → skip")
+            task.wait(2)
+            continue
+        end
+
+        -- Farm mob cho đến khi quest xong
+        local questStartBlaze = countItem("Blaze Ember")
+
+        repeat
+            local mob = findMob(mobNames)
+            if not mob then
+                guiLog("Không thấy mob → di chuyển")
+                tweenTo(spawnCF)
+                task.wait(2)
+                mob = findMob(mobNames)
+            end
+
+            if mob then
+                repeat
+                    task.wait(0.08)
+                    pcall(function()
+                        if not mob.Parent or mob.Humanoid.Health <= 0 then return end
+                        tweenTo(mob.HumanoidRootPart.CFrame * CFrame.new(0, 20, 6))
+                        attackNearby()
+                    end)
+                until not mob.Parent
+                    or not mob:FindFirstChild("Humanoid")
+                    or mob.Humanoid.Health <= 0
+                    or not isQuestActive()
+                task.wait(0.3)
+            else
+                task.wait(1)
+            end
+        until not isQuestActive()
+            or not getgenv().FARM_RUNNING
+
+        local newBlaze = countItem("Blaze Ember")
+        guiLog(("Blaze Ember: %d → %d"):format(questStartBlaze, newBlaze))
+        task.wait(0.5)
+    end
+
+    guiLog("✓ Blaze Ember: " .. countItem("Blaze Ember") .. "/45")
+end
+
+-- ══════════════════════════════════════════
+--  HAKI RAINBOW
+--  Boss order: Stone → Hydra Leader → Kilo Admiral
+--              → Captain Elephant → Beautiful Pirate
+--  Lặp cho đến khi có Rainbow Haki
+--  Hop nếu không tìm thấy mob sau 5 giây
+-- ══════════════════════════════════════════
+local RAINBOW_BOSSES = {
+    {
+        name     = "Stone",
+        questKey = "Stone",
+        npc      = "HornedMan",
+        spawn    = CFrame.new(-1086, 38, 6768),
+        entrance = nil,
+    },
+    {
+        name     = "Hydra Leader",
+        questKey = "Hydra Leader",
+        npc      = "HornedMan",
+        spawn    = CFrame.new(5821, 1019, -73),
+        entrance = Vector3.new(5643, 1013, -340),
+    },
+    {
+        name     = "Kilo Admiral",
+        questKey = "Kilo Admiral",
+        npc      = "HornedMan",
+        spawn    = CFrame.new(2877, 423, -7207),
+        entrance = nil,
+    },
+    {
+        name     = "Captain Elephant",
+        questKey = "Captain Elephant",
+        npc      = "HornedMan",
+        spawn    = CFrame.new(-13376, 433, -8071),
+        entrance = Vector3.new(-12462, 375, -7552),
+    },
+    {
+        name     = "Beautiful Pirate",
+        questKey = "Beautiful Pirate",
+        npc      = "HornedMan",
+        spawn    = CFrame.new(5241, 89, 199),
+        entrance = Vector3.new(5314, 22, -125),
+    },
+}
+
+local HORNED_MAN_POS = CFrame.new(-11892, 930, -8760)
+
+local function hasRainbowHaki()
+    -- Check inventory hoặc character attribute
+    local ok, val = pcall(function()
+        return LP.Data.Haki.Value == "Rainbow"
+            or LP.Data.Haki.Value == "rainbow"
+    end)
+    if ok and val then return true end
+
+    -- fallback check item
+    local inv = safeInvoke("getInventory")
+    if type(inv) == "table" then
+        for _, v in pairs(inv) do
+            if tostring(v.Name):lower():find("rainbow") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function requestEntranceHaki(pos)
+    if not pos then return end
+    pcall(function()
+        CommF:InvokeServer("requestEntrance", pos)
+    end)
+    task.wait(1)
+end
+
+local function acceptHakiQuest()
+    -- Đi tới HornedMan nhận bet
+    tweenTo(HORNED_MAN_POS)
+    task.wait(1)
+    safeInvoke("HornedMan", "Bet")
+    task.wait(1)
+    return isQuestActive()
+end
+
+local function farmRainbowBoss(boss)
+    -- Di chuyển tới spawn boss
+    if boss.entrance then
+        requestEntranceHaki(boss.entrance)
+    end
+    tweenTo(boss.spawn)
+    task.wait(1)
+
+    -- Tìm mob
+    local mob = findMob({boss.name})
+    if not mob then
+        guiLog("Không thấy " .. boss.name .. " (5s) → Hop")
+        task.wait(5)
+        mob = findMob({boss.name})
+        if not mob then
+            HopServer("No " .. boss.name)
+            task.wait(8)
+            return false
+        end
+    end
+
+    guiLog("Attack: " .. boss.name)
+    equipMelee()
+
+    repeat
+        task.wait(0.08)
+        pcall(function()
+            if not mob.Parent or mob.Humanoid.Health <= 0 then return end
+            tweenTo(mob.HumanoidRootPart.CFrame * CFrame.new(0, 20, 6))
+            attackNearby()
+        end)
+    until not mob.Parent
+        or not mob:FindFirstChild("Humanoid")
+        or mob.Humanoid.Health <= 0
+        or not isQuestActive()
+        or not getgenv().FARM_RUNNING
+
+    guiLog("✓ " .. boss.name .. " done")
+    task.wait(1)
+    return true
+end
+
+local function farmHakiRainbow()
+    guiLog("Phase 3: Haki Rainbow")
+    hdr.Text      = "FARM HAKI RAINBOW"
+    hdr.TextColor3 = Color3.fromRGB(180, 100, 255)
+
+    while getgenv().FARM_RUNNING and not hasRainbowHaki() do
+
+        -- Nhận quest từ HornedMan nếu chưa có
+        if not isQuestActive() then
+            guiLog("Nhận quest HornedMan...")
+            local ok = acceptHakiQuest()
+            if not ok then
+                guiLog("Không nhận được quest → thử lại")
+                task.wait(2)
+                continue
+            end
+        end
+
+        local title = getQuestTitle()
+        guiLog("Quest: " .. title)
+
+        -- Tìm boss tương ứng
+        local matched = nil
+        for _, boss in ipairs(RAINBOW_BOSSES) do
+            if title:find(boss.questKey) then
+                matched = boss
+                break
+            end
+        end
+
+        if matched then
+            farmRainbowBoss(matched)
+        else
+            guiLog("Quest không khớp boss nào: " .. title)
+            task.wait(2)
+        end
+    end
+
+    if hasRainbowHaki() then
+        guiLog("✓ RAINBOW HAKI DONE!")
+    end
+end
+
+-- ══════════════════════════════════════════
+--  UPDATE PROGRESS (override để thêm haki)
+-- ══════════════════════════════════════════
+local function updateProgress()
+    local scale = countItem("Dragon Scale")
+    local blaze = countItem("Blaze Ember")
+    local haki  = hasRainbowHaki() and "✓" or "✗"
+    progLbl.Text = ("Scale:%d/5 Blaze:%d/45 Haki:%s"):format(
+        scale, blaze, haki
+    )
+end
+
+-- ══════════════════════════════════════════
+--  MAIN
+-- ══════════════════════════════════════════
+task.spawn(function()
+    guiLog("FARM LOADED")
+    updateProgress()
+
+    ensureSea3()
+    waitAlive()
+
+    -- Phase 1: Dragon Scale
+    if countItem("Dragon Scale") < TARGET_DRAGON_SCALE then
+        guiLog("Phase 1: Dragon Scale")
+        hdr.Text = "FARM DRAGON SCALE"
+        farmDragonScale()
+    else
+        guiLog("Dragon Scale đã đủ ✓")
+    end
+
+    waitAlive()
+
+    -- Phase 2: Blaze Ember
+    if countItem("Blaze Ember") < TARGET_BLAZE_EMBER then
+        guiLog("Phase 2: Blaze Ember")
+        hdr.Text = "FARM BLAZE EMBER"
+        farmBlazeEmber()
+    else
+        guiLog("Blaze Ember đã đủ ✓")
+    end
+
+    waitAlive()
+    updateProgress()
+
+    -- Phase 3: Haki Rainbow
+    if not hasRainbowHaki() then
+        farmHakiRainbow()
+    else
+        guiLog("Rainbow Haki đã có ✓")
+    end
+
+    updateProgress()
+
+    -- Done
+    guiLog("✓ ALL DONE!")
+    hdr.TextColor3 = Color3.fromRGB(80, 255, 130)
+    hdr.Text       = "✓ ALL COMPLETE"
+    getgenv().FARM_RUNNING = false
+end)
