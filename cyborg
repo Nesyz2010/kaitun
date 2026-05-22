@@ -8,6 +8,18 @@ repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game:GetService("Players").LocalPlayer
 repeat task.wait() until game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
 
+-- Chờ Remotes load xong
+repeat task.wait(0.5) until game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+repeat task.wait(0.5) until game:GetService("ReplicatedStorage").Remotes:FindFirstChild("CommF_")
+
+-- Chờ character load + humanoid sẵn sàng
+repeat task.wait(0.5) until game:GetService("Players").LocalPlayer.Character
+repeat task.wait(0.5) until game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid")
+repeat task.wait(0.5) until game:GetService("Players").LocalPlayer.Character.Humanoid.Health > 0
+
+-- Chờ game ổn định thêm
+task.wait(4)
+
 -- Auto chọn team Pirates khi vào server
 do
     repeat
