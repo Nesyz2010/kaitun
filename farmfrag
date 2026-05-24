@@ -1,0 +1,469 @@
+--// KAITUN FARM F - KATAKURI SEA 3
+--// Ưu tiên join server có data Katakuri/DoughKing từ server.js
+--// Nếu không có data thì spam hop scan như KaitunGhoul
+--// Gặp boss Katakuri/Dough King/Cake Prince thì attack tới chết rồi hop server khác
+
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game:GetService("Players").LocalPlayer
+repeat task.wait() until game:GetService("Players").LocalPlayer.Character
+
+getgenv().KATAKURI_FARM = true
+
+-- CONFIG
+getgenv().SERVER_URL = getgenv().SERVER_URL or "http://139.162.85.195:5000"
+getgenv().SERVER_SECRET = getgenv().SERVER_SECRET or ""
+
+getgenv().TEAM = getgenv().TEAM or "Pirates"
+getgenv().HOP_MAX_PLAYERS = getgenv().HOP_MAX_PLAYERS or 10
+getgenv().API_CHECK_EVERY = getgenv().API_CHECK_EVERY or 5
+getgenv().HOP_COOLDOWN = getgenv().HOP_COOLDOWN or 8
+getgenv().TWEEN_SPEED = getgenv().TWEEN_SPEED or 315
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+
+local plr = Players.LocalPlayer
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+local PlaceIdSea3 = 7449423635
+
+local function log(...)
+    print("[KATAKURI F]", ...)
+end
+
+plr.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+task.spawn(function()
+    repeat task.wait() until plr:FindFirstChild("PlayerGui")
+    if plr.Team == nil then
+        repeat task.wait()
+            pcall(function()
+                CommF:InvokeServer("SetTeam", getgenv().TEAM)
+            end)
+        until plr.Team ~= nil or not getgenv().KATAKURI_FARM
+        task.wait(2)
+    end
+end)
+
+task.spawn(function()
+    while getgenv().KATAKURI_FARM and task.wait(5) do
+        if game.PlaceId ~= PlaceIdSea3 then
+            log("Travel Sea 3...")
+            pcall(function()
+                CommF:InvokeServer("TravelZou")
+            end)
+        end
+    end
+end)
+
+local function getChar()
+    return plr.Character or plr.CharacterAdded:Wait()
+end
+
+local function getHRP()
+    return getChar():WaitForChild("HumanoidRootPart", 20)
+end
+
+local function getHum()
+    return getChar():WaitForChild("Humanoid", 20)
+end
+
+local function equipMelee()
+    local bp = plr:FindFirstChildOfClass("Backpack")
+    if not bp then return end
+
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") and tool.ToolTip == "Melee" then
+            getHum():EquipTool(tool)
+            return
+        end
+    end
+
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") then
+            getHum():EquipTool(tool)
+            return
+        end
+    end
+end
+
+task.spawn(function()
+    while getgenv().KATAKURI_FARM and task.wait(5) do
+        pcall(function()
+            if not getChar():FindFirstChild("HasBuso") then
+                CommF:InvokeServer("Buso")
+            end
+        end)
+    end
+end)
+
+local function topos(cf)
+    local char = getChar()
+    local hrp = getHRP()
+    local hum = getHum()
+
+    pcall(function()
+        if hum.Sit then
+            hum.Sit = false
+            hum.Jump = true
+        end
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end)
+
+    local dist = (hrp.Position - cf.Position).Magnitude
+    if dist < 15 then
+        hrp.CFrame = cf
+        return true
+    end
+
+    local tw = TweenService:Create(
+        hrp,
+        TweenInfo.new(dist / getgenv().TWEEN_SPEED, Enum.EasingStyle.Linear),
+        {CFrame = cf}
+    )
+
+    tw:Play()
+    tw.Completed:Wait()
+    return true
+end
+
+local function getRequest()
+    return (syn and syn.request)
+        or (http and http.request)
+        or http_request
+        or request
+end
+
+local function httpGet(path)
+    local req = getRequest()
+    if not req then return nil end
+    local ok, res = pcall(function()
+        return req({
+            Url = tostring(getgenv().SERVER_URL) .. path,
+            Method = "GET"
+        })
+    end)
+    return ok and res or nil
+end
+
+local function httpPost(path, payload)
+    local req = getRequest()
+    if not req then return nil end
+    local ok, res = pcall(function()
+        return req({
+            Url = tostring(getgenv().SERVER_URL) .. path,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
+    return ok and res or nil
+end
+
+local function decode(body)
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(body)
+    end)
+    return ok and data or nil
+end
+
+local lastReport = {}
+
+local function reportEvent(eventName, extra, cooldown)
+    cooldown = cooldown or 60
+    local key = eventName .. ":" .. tostring(game.JobId)
+    local now = os.time()
+
+    if lastReport[key] and now - lastReport[key] < cooldown then
+        return
+    end
+    lastReport[key] = now
+
+    httpPost("/event", {
+        event = eventName,
+        player = plr.Name,
+        jobId = tostring(game.JobId),
+        placeId = game.PlaceId,
+        sea = "Sea 3",
+        playerCount = #Players:GetPlayers(),
+        extra = tostring(extra or ""),
+        secret = getgenv().SERVER_SECRET
+    })
+
+    log("Report", eventName, extra or "")
+end
+
+local apiLastId = 0
+local joinedJobs = {}
+local lastHop = 0
+
+local function teleportJob(jobId, reason)
+    if not jobId or jobId == "" then return false end
+    if tostring(jobId) == tostring(game.JobId) then return false end
+    if os.clock() - lastHop < getgenv().HOP_COOLDOWN then return false end
+    if joinedJobs[jobId] and os.time() - joinedJobs[jobId] < 120 then return false end
+
+    lastHop = os.clock()
+    joinedJobs[jobId] = os.time()
+
+    log("API Join", reason or "DoughKing", jobId)
+
+    local browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if browser then
+        pcall(function()
+            browser:InvokeServer("teleport", jobId)
+        end)
+        return true
+    end
+
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, plr)
+    end)
+
+    return true
+end
+
+local function checkAPIKatakuri()
+    local secretParam = ""
+    if getgenv().SERVER_SECRET ~= "" then
+        secretParam = "&secret=" .. tostring(getgenv().SERVER_SECRET)
+    end
+
+    local res = httpGet("/command?lastId=" .. tostring(apiLastId) .. secretParam)
+    if not res or not res.Body then return end
+
+    local data = decode(res.Body)
+    if not data then return end
+
+    local cmd
+    if data.commands and #data.commands > 0 then
+        cmd = data.commands[#data.commands]
+    elseif data.status == "command" then
+        cmd = data
+    end
+
+    if not cmd then return end
+
+    if cmd.id and tonumber(cmd.id) then
+        apiLastId = math.max(apiLastId, tonumber(cmd.id))
+    end
+
+    local ev = tostring(cmd.event or "")
+    if (ev == "DoughKing" or ev == "Katakuri" or ev == "CakePrince")
+        and cmd.jobId
+        and tostring(cmd.jobId) ~= tostring(game.JobId)
+    then
+        teleportJob(tostring(cmd.jobId), ev)
+    end
+end
+
+task.spawn(function()
+    while getgenv().KATAKURI_FARM and task.wait(getgenv().API_CHECK_EVERY) do
+        pcall(checkAPIKatakuri)
+    end
+end)
+
+local triedServers = {}
+
+local function cleanTried()
+    for jobId, tm in pairs(triedServers) do
+        if os.time() - tm > 600 then
+            triedServers[jobId] = nil
+        end
+    end
+end
+
+local function hopServer(reason)
+    if os.clock() - lastHop < getgenv().HOP_COOLDOWN then return false end
+    lastHop = os.clock()
+    cleanTried()
+
+    local browser = ReplicatedStorage:FindFirstChild("__ServerBrowser")
+    if not browser then
+        warn("[KATAKURI F] No __ServerBrowser")
+        return false
+    end
+
+    local servers = {}
+
+    for page = 1, 100 do
+        local ok, data = pcall(function()
+            return browser:InvokeServer(page)
+        end)
+
+        if ok and type(data) == "table" then
+            for jobId, v in pairs(data) do
+                local count = tonumber(v.Count) or 99
+                if jobId ~= game.JobId
+                    and not triedServers[jobId]
+                    and count <= getgenv().HOP_MAX_PLAYERS
+                then
+                    table.insert(servers, {
+                        JobId = jobId,
+                        Count = count,
+                        Region = tostring(v.Region)
+                    })
+                end
+            end
+        end
+
+        if #servers > 0 then break end
+    end
+
+    table.sort(servers, function(a, b)
+        return a.Count < b.Count
+    end)
+
+    local chosen = servers[1]
+    if not chosen then
+        warn("[KATAKURI F] No server found")
+        return false
+    end
+
+    triedServers[chosen.JobId] = os.time()
+
+    print("========== KATAKURI HOP ==========")
+    print("Reason:", reason or "Scan")
+    print("Found Server:", chosen.JobId)
+    print("Player Count:", chosen.Count)
+    print("Region:", chosen.Region)
+    print("Teleporting...")
+    print("==================================")
+
+    pcall(function()
+        browser:InvokeServer("teleport", chosen.JobId)
+    end)
+
+    return true
+end
+
+local BossNames = {
+    "Dough King",
+    "Cake Prince"
+}
+
+local function findBoss()
+    local folders = {
+        workspace:FindFirstChild("Enemies"),
+        ReplicatedStorage
+    }
+
+    for _, folder in ipairs(folders) do
+        if folder then
+            for _, mob in ipairs(folder:GetChildren()) do
+                if mob:IsA("Model") then
+                    for _, name in ipairs(BossNames) do
+                        if mob.Name:lower():find(name:lower()) then
+                            local hum = mob:FindFirstChild("Humanoid")
+                            local hrp = mob:FindFirstChild("HumanoidRootPart")
+                            if hum and hrp and hum.Health > 0 then
+                                return mob
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local Modules = ReplicatedStorage:WaitForChild("Modules")
+local Net = Modules:WaitForChild("Net")
+local RegisterAttack = Net:WaitForChild("RE/RegisterAttack")
+local RegisterHit = Net:WaitForChild("RE/RegisterHit")
+
+local SUCCESS_FLAGS, COMBAT_REMOTE_THREAD = pcall(function()
+    return require(Modules.Flags).COMBAT_REMOTE_THREAD or false
+end)
+
+local SUCCESS_HIT, HIT_FUNCTION = pcall(function()
+    return (getmenv or getsenv)(Net)._G.SendHitsToServer
+end)
+
+local function sendAttack(target)
+    if not target or not target.Parent then return end
+
+    local root = target:FindFirstChild("HumanoidRootPart")
+    local head = target:FindFirstChild("Head") or root
+    if not root or not head then return end
+
+    local args = {
+        head,
+        {
+            {target, root}
+        }
+    }
+
+    pcall(function()
+        RegisterAttack:FireServer(0.1)
+        if SUCCESS_FLAGS and COMBAT_REMOTE_THREAD and SUCCESS_HIT and HIT_FUNCTION then
+            HIT_FUNCTION(args[1], args[2])
+        else
+            RegisterHit:FireServer(args[1], args[2])
+        end
+    end)
+end
+
+local function attackBoss(boss)
+    if not boss then return false end
+
+    equipMelee()
+    log("Attack boss:", boss.Name)
+
+    reportEvent("DoughKing", boss.Name .. " | HP:" .. math.floor(boss.Humanoid.Health), 120)
+
+    repeat task.wait(0.08)
+        if not boss.Parent or not boss:FindFirstChild("HumanoidRootPart") then break end
+
+        pcall(function()
+            boss.Humanoid.WalkSpeed = 0
+            boss.HumanoidRootPart.Size = Vector3.new(1, 1, 1)
+        end)
+
+        topos(boss.HumanoidRootPart.CFrame * CFrame.new(0, 35, 8))
+        sendAttack(boss)
+    until not getgenv().KATAKURI_FARM
+        or not boss.Parent
+        or not boss:FindFirstChild("Humanoid")
+        or boss.Humanoid.Health <= 0
+
+    log("Boss dead/missing -> hop")
+    task.wait(1)
+    hopServer("Boss Dead")
+    return true
+end
+
+task.spawn(function()
+    log("KATAKURI FARM F LOADED")
+
+    while getgenv().KATAKURI_FARM do
+        if game.PlaceId ~= PlaceIdSea3 then
+            task.wait(3)
+            continue
+        end
+
+        local boss = findBoss()
+
+        if boss then
+            attackBoss(boss)
+        else
+            log("No Katakuri boss -> fallback hop scan")
+            hopServer("No Boss Scan")
+            task.wait(4)
+        end
+
+        task.wait(1)
+    end
+end)
