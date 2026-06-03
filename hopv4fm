@@ -1,88 +1,15 @@
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 getgenv().Config = {
     ["Allies"] = {
-        "UltraReece0761", -- Help 1 (Tự động cấp quyền intrail cho Main)
-        "PureJackson6395", -- Help 2 (Luôn join theo Help 1)
+        "", -- Help 1 (Tự động cấp quyền intrail cho Main)
+        "", -- Help 2 (Luôn join theo Help 1)
     },
     ["MainAccount"] = {
-        "AndreaWoodard349",
-        "AkikoBakkon05",
-        "BunniCrane605",
-        "NancyDillon10",
-        "NestGross89",
-        "PedroSchmidt621",
-        "JillianBlake95690",
-        "RonnieDelacruz87032",
-        "MarioRamirez9412",
-        "KaylaFischer29",
-        "RicardoBurch10489",
-        "JodiSchmidt1",
-        "LeonardOrr3808",
-        "MargaretTownsend64",
-        "SavannahKaufman79543",
-        "CristinaMullen05",
-        "TiffanyWintergreen7",
-        "YolandaKelly76285",
-        "LindsaySand212",
-        "MarcoShelton18",
-        "HaydenAguilar9396",
-        "MarioCook4228",
-        "AntonioBlackwell6228",
-        "FrancisBronze02854",
-        "BillRivera4",
-        "BaileyJacobs73947",
-        "ColleenSanford635",
-        "GilbertAllison4",
-        "CarolinePaul611",
-        "JordanWalters99",
-        "MiffySims9284",
-        "GaryBautista620",
-        "KristiBeard59934",
-        "BosKatherine04",
-        "BrianKim2679",
-        "ShannonAcevedo882",
-        "KiaraFletcher2",
-        "ValerieFoley1520",
-        "FlowerHopkins6225",
-        "AnnetteMyers45",
-        "MooLove17",
-        "KerriRios2211",
-        "RitaPhillips9900",
-        "Ash3rSkyStormy",
-        "AustinEvans63987",
-        "FietjeLangon09",
-        "ElaineBlush1412",
-        "JeanOnyx305",
-        "AnnWilson1649",
-        "RandyDonovan82630",
-        "TerriCardenas48525",
-        "SheliaAndrade1",
-        "SherylCurtis9677",
-        "DuckyArias75024",
-        "DrewContreras95",
-        "FlowerBlackburn801",
-        "VanessaMauve22916",
-        "DinoWeaver4",
-        "BrentSchaefer974",
-        "TeresaWerner0878",
-        "NestHazel908",
-        "RebekahMoran9",
-        "StevenKhaki48668",
-        "JaniceAcosta9690",
-        "CarrieBowen47150",
-        "GailMaynard33",
-        "NancyBlanchard73",
-        "TommyVillegas148",
-        "SavannahBlair6687",
-        "RavenProctor94366",
-        "TonySchroeder752",
-        "SquirrelNolan60",
-        "MandyMint87681",
-        "RonaldMahogany4296",
-        "ChloeOpal985"
+        "",
+        ""
     }
 }
-local BASE_URL = "http://fi6.bot-hosting.net:21934"
+local BASE_URL = "http://us2.bot-hosting.net:20425"
 local myName = game.Players.LocalPlayer.Name
 
 
