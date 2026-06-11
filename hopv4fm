@@ -214,20 +214,56 @@ local function hopServer(jobId)
 end
 
 local function hopFullMoon()
+    local url = "http://mbasic7.pikamc.vn:25082/api/name=fullmoon?apikey=CONCACDUMAMAY"
     local success, result = pcall(function()
-        return game.HttpService:JSONDecode(game:HttpGet("http://mbasic7.pikamc.vn:25082/api/name=fullmoon?apikey=CONCACDUMAMAY"))
+        local body = game:HttpGet(url)
+        return game.HttpService:JSONDecode(body)
     end)
-    if success and result and result.success and result.data then
-        for _, v in pairs(result.data) do
-            if v.jobid and v.jobid ~= game.JobId and v.player >= 1 and v.player < 11 then
-                addLog("Full Moon found! Nhảy...", Color3.fromRGB(180, 100, 255))
-                hopServer(v.jobid)
-                return true
-            end
+
+    if not success or not result then
+        addLog("FM API lỗi / không đọc được dữ liệu", Color3.fromRGB(255, 80, 80))
+        return false
+    end
+
+    if not result.success or type(result.data) ~= "table" then
+        addLog("FM API không có data hợp lệ", Color3.fromRGB(255, 80, 80))
+        return false
+    end
+
+    local candidates = {}
+    for _, v in pairs(result.data) do
+        local jobid = tostring(v.jobid or "")
+        local players = tonumber(v.player or v.players or v.Count or 0) or 0
+        local placeid = tonumber(v.placeid or v.PlaceId or 0) or 0
+
+        -- FIX: API có rất nhiều FM 4-7 player, bản cũ lọc >=8 nên không bao giờ hop.
+        if jobid ~= ""
+            and jobid ~= game.JobId
+            and players > 0
+            and players < 12
+            and (placeid == 0 or placeid == game.PlaceId or placeid == 100117331123089 or placeid == 7449423635) then
+            table.insert(candidates, {jobid = jobid, player = players, placeid = placeid})
         end
     end
-    addLog("Không tìm thấy Full Moon server", Color3.fromRGB(255, 80, 80))
-    return false
+
+    table.sort(candidates, function(a, b)
+        -- ưu tiên server nhiều người hơn nhưng chưa full
+        return (a.player or 0) > (b.player or 0)
+    end)
+
+    if #candidates <= 0 then
+        addLog("Có API nhưng không có FM job hợp lệ", Color3.fromRGB(255, 80, 80))
+        return false
+    end
+
+    for i, v in ipairs(candidates) do
+        addLog("FM job " .. i .. " | P:" .. tostring(v.player) .. " -> " .. tostring(v.jobid):sub(1, 8), Color3.fromRGB(180, 100, 255))
+        hopServer(v.jobid)
+        task.wait(1.5)
+        if i >= 3 then break end -- thử tối đa 3 job mỗi lần gọi, tránh spam quá mạnh
+    end
+
+    return true
 end
 
 function Hop(maxHops)
