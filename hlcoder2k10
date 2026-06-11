@@ -13,113 +13,69 @@ end
 local BASE_URL = "http://fi7.bot-hosting.net:20320"
 local myName = game.Players.LocalPlayer.Name
 
--- ================= UI LOG =================
+-- ================= CENTER LOG ONLY =================
+local TweenService_UI = game:GetService("TweenService")
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LogUI"
+screenGui.Name = "CenterLogUI"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = game.Players.LocalPlayer.PlayerGui
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 340, 0, 220)
-frame.Position = UDim2.new(0, 10, 0.5, -110)
-frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-frame.BackgroundTransparency = 0.1
-frame.BorderSizePixel = 0
-frame.Parent = screenGui
-
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Thickness = 1.5
-stroke.Transparency = 0.4
-stroke.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 28)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
-title.BackgroundTransparency = 0.6
-title.BorderSizePixel = 0
-title.Text = "  ● SYSTEM LOG — " .. myName
-title.TextColor3 = Color3.fromRGB(200, 240, 255)
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Font = Enum.Font.GothamBold
-title.TextSize = 12
-title.Parent = frame
-Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local roleLabel = Instance.new("TextLabel")
-roleLabel.Size = UDim2.new(1, -10, 0, 20)
-roleLabel.Position = UDim2.new(0, 5, 0, 30)
+roleLabel.Name = "RoleLabel"
+roleLabel.Size = UDim2.new(0, 700, 0, 26)
+roleLabel.Position = UDim2.new(0.5, -350, 0.34, 0)
 roleLabel.BackgroundTransparency = 1
 roleLabel.Text = "Role: loading..."
 roleLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
-roleLabel.TextXAlignment = Enum.TextXAlignment.Left
+roleLabel.TextStrokeTransparency = 0.2
+roleLabel.TextXAlignment = Enum.TextXAlignment.Center
 roleLabel.Font = Enum.Font.GothamBold
-roleLabel.TextSize = 11
-roleLabel.Parent = frame
+roleLabel.TextSize = 18
+roleLabel.Parent = screenGui
 
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -58)
-scrollFrame.Position = UDim2.new(0, 5, 0, 54)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 3
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.Parent = frame
+local logLabel = Instance.new("TextLabel")
+logLabel.Name = "CenterLogLabel"
+logLabel.Size = UDim2.new(0, 900, 0, 46)
+logLabel.Position = UDim2.new(0.5, -450, 0.39, 0)
+logLabel.BackgroundTransparency = 1
+logLabel.Text = ""
+logLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+logLabel.TextStrokeTransparency = 0
+logLabel.TextXAlignment = Enum.TextXAlignment.Center
+logLabel.Font = Enum.Font.GothamBold
+logLabel.TextScaled = true
+logLabel.Parent = screenGui
 
-local listLayout = Instance.new("UIListLayout")
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 2)
-listLayout.Parent = scrollFrame
-
-local logCount = 0
+local lastFadeId = 0
 local function addLog(text, color)
-    logCount = logCount + 1
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -4, 0, 16)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = os.date("%H:%M:%S") .. " " .. text
-    lbl.TextColor3 = color or Color3.fromRGB(180, 220, 255)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Font = Enum.Font.Code
-    lbl.TextSize = 10
-    lbl.TextWrapped = true
-    lbl.LayoutOrder = logCount
-    lbl.Parent = scrollFrame
-    task.wait()
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
-    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
-    if logCount > 50 then
-        for _, c in pairs(scrollFrame:GetChildren()) do
-            if c:IsA("TextLabel") then c:Destroy() break end
-        end
-    end
-end
+    lastFadeId = lastFadeId + 1
+    local myFadeId = lastFadeId
+    logLabel.Text = tostring(text)
+    logLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    logLabel.TextTransparency = 1
+    logLabel.TextStrokeTransparency = 1
 
--- ================= DRAG =================
-local dragging, dragStart, startPos
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+    pcall(function()
+        TweenService_UI:Create(logLabel, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {
+            TextTransparency = 0,
+            TextStrokeTransparency = 0
+        }):Play()
+    end)
+
+    print("[V4 LOG] " .. tostring(text))
+
+    task.delay(2.25, function()
+        if myFadeId ~= lastFadeId then return end
+        pcall(function()
+            TweenService_UI:Create(logLabel, TweenInfo.new(0.25, Enum.EasingStyle.Linear), {
+                TextTransparency = 1,
+                TextStrokeTransparency = 1
+            }):Play()
+        end)
+    end)
+end
 
 -- ================= WAIT GAME =================
 repeat wait(1)
