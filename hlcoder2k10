@@ -10,7 +10,8 @@ if not getgenv().Config then
     getgenv().Config = { ["Allies"] = {}, ["MainAccount"] = {} }
 end
 
-local BASE_URL = "http://fi7.bot-hosting.net:20320"
+local BASE_URL = "http://fi7.bot-hosting.net:20320" -- Main V4 API
+local RARE_URL = "http://us3.bot-hosting.net:21709" -- Full Moon / Mirage POST API
 local myName = game.Players.LocalPlayer.Name
 
 -- ================= FAILED REALM BLACKLIST =================
@@ -145,6 +146,21 @@ function isfullmoon()
     return game:GetService("Lighting"):GetAttribute("MoonPhase") == 5
 end
 
+function ismirage()
+    local ok, found = pcall(function()
+        local wo = workspace:FindFirstChild("_WorldOrigin")
+        local locations = wo and wo:FindFirstChild("Locations")
+        if locations and locations:FindFirstChild("Mirage Island") then
+            return true
+        end
+        if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("MysticIsland") then
+            return true
+        end
+        return false
+    end)
+    return ok and found or false
+end
+
 function getdialogoftemple()
     local ok, i, d, f = pcall(function()
         return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("UpgradeRace", "Check")
@@ -186,6 +202,86 @@ local function requestAPI(endpoint, method, body)
     end
     return nil
 end
+
+-- ================= RARE SERVER POSTER =================
+local LastPost = { fullmoon = 0, mirage = 0 }
+local POST_COOLDOWN = tonumber(getgenv().Config.PostCooldown) or 60
+
+local function getPlayerCount()
+    local ok, count = pcall(function() return #game:GetService("Players"):GetPlayers() end)
+    return ok and count or 0
+end
+
+local function postRareServer(kind)
+    local now = tick()
+    if LastPost[kind] and now - LastPost[kind] < POST_COOLDOWN then
+        return false
+    end
+    LastPost[kind] = now
+
+    local moonPhase = nil
+    pcall(function() moonPhase = game:GetService("Lighting"):GetAttribute("MoonPhase") end)
+
+    local payload = {
+        jobid = game.JobId,
+        placeid = game.PlaceId,
+        player = getPlayerCount(),
+        maxplayer = game:GetService("Players").MaxPlayers,
+        username = myName,
+        moonphase = moonPhase,
+        fullmoon = isfullmoon(),
+        night = isnight(),
+        mirage = ismirage(),
+        timestamp = os.time()
+    }
+
+    local endpoint = kind == "mirage" and "/mirage" or "/fullmoon"
+
+    local ok, res = pcall(function()
+        local req = (http_request or http and http.request or request)
+        if not req then return nil end
+        return req({
+            Url = RARE_URL .. endpoint,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = game.HttpService:JSONEncode(payload)
+        })
+    end)
+
+    local statusCode = res and (res.StatusCode or res.status_code or res.Status)
+    local successPost = ok and res and (not statusCode or (tonumber(statusCode) and tonumber(statusCode) >= 200 and tonumber(statusCode) < 300))
+
+    if successPost then
+        if kind == "mirage" then
+            addLog(
+                "MIRAGE POSTED | " .. tostring(game.JobId):sub(1, 8) .. " | " .. tostring(getPlayerCount()) .. "p",
+                Color3.fromRGB(0, 255, 180)
+            )
+        else
+            addLog(
+                "FM POSTED | " .. tostring(game.JobId):sub(1, 8) .. " | " .. tostring(getPlayerCount()) .. "p",
+                Color3.fromRGB(0, 255, 255)
+            )
+        end
+        return true
+    end
+
+    addLog("POST FAILED | " .. tostring(kind), Color3.fromRGB(255, 100, 100))
+    return false
+end
+
+task.spawn(function()
+    while task.wait(2) do
+        pcall(function()
+            if isfullmoon() and isnight() then
+                postRareServer("fullmoon")
+            end
+            if ismirage() then
+                postRareServer("mirage")
+            end
+        end)
+    end
+end)
 
 local identify_data = requestAPI("/identify", "POST", {
     name = myName,
