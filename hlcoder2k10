@@ -6,7 +6,7 @@ local t0 = tick()
 repeat task.wait(0.1) until getgenv().Config or tick() - t0 > timeout
 
 if not getgenv().Config then
-    warn("[V4] Không tìm thấy Config, dùng config mặc định rỗng")
+    warn("[V4] Config not detected, fallback profile loaded")
     getgenv().Config = { ["Allies"] = {}, ["MainAccount"] = {} }
 end
 
@@ -84,7 +84,7 @@ until game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
     and not game.Players.LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen")
 
 if workspace:GetAttribute("MAP") and workspace:GetAttribute("MAP") ~= "Sea3" then
-    addLog("Không ở Sea3 -> không auto travel", Color3.fromRGB(255, 150, 50))
+    addLog("Sea 3 required - travel skipped", Color3.fromRGB(255, 150, 50))
 end
 
 -- ================= HELPERS =================
@@ -149,7 +149,7 @@ local myRole = identify_data and identify_data.role or "unknown"
 local myIndex = identify_data and identify_data.index or 0
 
 roleLabel.Text = "Role: " .. myRole:upper() .. (myIndex > 0 and (" #" .. myIndex) or "") .. " | " .. myName
-addLog("Khởi động | Role: " .. myRole .. " | Index: " .. myIndex, Color3.fromRGB(0, 255, 180))
+addLog("Boot sequence | Unit: " .. myRole .. " | Slot: " .. myIndex, Color3.fromRGB(0, 255, 180))
 
 local function getJobId(playerName)
     local data = requestAPI("/noguchi?name=" .. playerName)
@@ -158,13 +158,13 @@ local function getJobId(playerName)
 end
 
 local function setMyStatus(status)
-    addLog("Set status: " .. status, Color3.fromRGB(255, 180, 80))
+    addLog("State pushed: " .. status, Color3.fromRGB(255, 180, 80))
     requestAPI("/mainstatus?name=" .. myName, "POST", { status = status })
 end
 
 local function hopServer(jobId)
     if jobId and jobId ~= game.JobId then
-        addLog("Nhảy server: " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
+        addLog("Transferring realm: " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
         game:GetService("ReplicatedStorage"):WaitForChild("__ServerBrowser"):InvokeServer("teleport", jobId)
     end
 end
@@ -177,7 +177,7 @@ local function hopFullMoon()
     end)
 
     if not success or not result or not result.success then
-        addLog("FM API loi / khong co data", Color3.fromRGB(255, 80, 80))
+        addLog("Moon feed unavailable", Color3.fromRGB(255, 80, 80))
         return false
     end
 
@@ -193,7 +193,7 @@ local function hopFullMoon()
         end
     end
 
-    addLog("FM API co " .. tostring(#list) .. " job", Color3.fromRGB(0, 255, 255))
+    addLog("Moon feed loaded: " .. tostring(#list) .. " realm(s)", Color3.fromRGB(0, 255, 255))
 
     -- Sort server it nguoi truoc de tranh full khi Ally2/Main join vao.
     table.sort(list, function(a, b)
@@ -209,21 +209,21 @@ local function hopFullMoon()
         if jobid and tostring(jobid) ~= tostring(game.JobId) then
             if player <= maxPlayer then
                 addLog(
-                    "TRY FM " .. tostring(player) .. "p | " .. tostring(jobid):sub(1, 8),
+                    "Locking moon realm " .. tostring(player) .. "p | " .. tostring(jobid):sub(1, 8),
                     Color3.fromRGB(150, 255, 255)
                 )
                 hopServer(jobid)
                 return true
             else
                 addLog(
-                    "Skip FM full " .. tostring(player) .. "p | max " .. tostring(maxPlayer),
+                    "Bypass crowded realm " .. tostring(player) .. "p | cap " .. tostring(maxPlayer),
                     Color3.fromRGB(255, 150, 50)
                 )
             end
         end
     end
 
-    addLog("Khong co FM job du slot <= " .. tostring(maxPlayer), Color3.fromRGB(255, 80, 80))
+    addLog("No moon realm with free slots <= " .. tostring(maxPlayer), Color3.fromRGB(255, 80, 80))
     return false
 end
 
@@ -237,18 +237,18 @@ function Hop(maxHops)
             for jobId, info in pairs(servers) do
                 if jobId ~= game.JobId and info.Count < 12 then
                     hopped = hopped + 1
-                    addLog("Hop " .. hopped .. "/" .. maxHops .. ": " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
+                    addLog("Realm shift " .. hopped .. "/" .. maxHops .. ": " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
                     ServerBrowser:InvokeServer("teleport", jobId)
                     task.wait(0.25)
                     if hopped >= maxHops then
-                        addLog("Đã thử đủ " .. maxHops .. " job -> đứng train", Color3.fromRGB(150, 200, 255))
+                        addLog("Relocation limit reached: " .. maxHops .. " realm(s) -> training hold", Color3.fromRGB(150, 200, 255))
                         return true
                     end
                 end
             end
         end
     end
-    addLog("Không tìm được job để hop", Color3.fromRGB(255, 100, 100))
+    addLog("No fallback realm available", Color3.fromRGB(255, 100, 100))
     return false
 end
 
@@ -274,7 +274,7 @@ end)
 -- ================= ALLY =================
 if myRole == "ally" then
     if myIndex == 1 then
-        addLog("[Help 1] Ally2 truoc -> CALL 1 Main, training moi call tiep", Color3.fromRGB(100, 200, 255))
+        addLog("[Support-1] Sync support first, then dispatch one primary", Color3.fromRGB(100, 200, 255))
 
         local ALLY1_CHECK_DELAY    = 0.15
         local FM_HOP_COOLDOWN      = 4
@@ -324,7 +324,7 @@ if myRole == "ally" then
                 if not isMoon then
                     if tick() - lastLog >= LOG_COOLDOWN then
                         lastLog = tick()
-                        addLog("Chua co FM -> tim server FM", Color3.fromRGB(255, 150, 50))
+                        addLog("Moon not aligned - scanning realms", Color3.fromRGB(255, 150, 50))
                     end
                     if tick() - lastFMHop >= FM_HOP_COOLDOWN then
                         lastFMHop = tick()
@@ -341,14 +341,14 @@ if myRole == "ally" then
                     local activeStatus = getMainStatus(allMains, activeMain)
 
                     if activeStatus == "training" or activeStatus == "done" then
-                        addLog("Main xong -> mo queue: " .. tostring(activeMain), Color3.fromRGB(0, 255, 180))
+                        addLog("Primary finished - queue released: " .. tostring(activeMain), Color3.fromRGB(0, 255, 180))
                         activeMain = nil activeSince = 0 lastRecallAt = 0
                         task.wait(0.2); break
                     end
 
                     local activeJob = getJobId(activeMain)
                     if not activeJob or activeJob == "" then
-                        addLog("Main offline -> mo queue: " .. tostring(activeMain), Color3.fromRGB(255, 120, 80))
+                        addLog("Primary offline - queue released: " .. tostring(activeMain), Color3.fromRGB(255, 120, 80))
                         activeMain = nil activeSince = 0 lastRecallAt = 0
                         task.wait(0.2); break
                     end
@@ -356,7 +356,7 @@ if myRole == "ally" then
                     if activeJob ~= game.JobId then
                         if tick() - lastRecallAt >= MAIN_RECALL_COOLDOWN then
                             lastRecallAt = tick()
-                            addLog("CALL lai Main chua vao SV: " .. tostring(activeMain), Color3.fromRGB(255, 220, 0))
+                            addLog("Re-pinging primary not joined: " .. tostring(activeMain), Color3.fromRGB(255, 220, 0))
                             requestAPI("/mainstatus?name=" .. activeMain, "POST", {
                                 status = "intrail",
                                 caller = myName,
@@ -369,7 +369,7 @@ if myRole == "ally" then
 
                     if tick() - lastLog >= LOG_COOLDOWN then
                         lastLog = tick()
-                        addLog("Main da vao SV: " .. tostring(activeMain), Color3.fromRGB(100, 255, 180))
+                        addLog("Primary reached realm: " .. tostring(activeMain), Color3.fromRGB(100, 255, 180))
                     end
                     break
                 end
@@ -382,7 +382,7 @@ if myRole == "ally" then
 
                         local ally2Name = getgenv().Config.Allies and getgenv().Config.Allies[2]
                         if ally2Name and ally2Name ~= "" then
-                            addLog("FM ON -> CALL Ally2: " .. tostring(ally2Name), Color3.fromRGB(100, 200, 255))
+                            addLog("Moon active - syncing support: " .. tostring(ally2Name), Color3.fromRGB(100, 200, 255))
                             requestAPI("/mainstatus?name=" .. ally2Name, "POST", {
                                 status = "joinally",
                                 caller = myName,
@@ -393,16 +393,16 @@ if myRole == "ally" then
                             task.wait(0.35)
                             local ally2Job = getJobId(ally2Name)
                             if ally2Job and ally2Job == game.JobId then
-                                addLog("Ally2 da o SV -> CALL Main", Color3.fromRGB(100, 255, 180))
+                                addLog("Support present - dispatching primary", Color3.fromRGB(100, 255, 180))
                             else
-                                addLog("Da CALL Ally2 -> CALL Main", Color3.fromRGB(255, 180, 80))
+                                addLog("Support pinged - dispatching primary", Color3.fromRGB(255, 180, 80))
                             end
                         end
 
                         activeMain   = firstWaiting
                         activeSince  = tick()
                         lastRecallAt = tick()
-                        addLog("FM ON -> CALL Main: " .. tostring(firstWaiting), Color3.fromRGB(255, 220, 0))
+                        addLog("Moon active - primary dispatched: " .. tostring(firstWaiting), Color3.fromRGB(255, 220, 0))
                         requestAPI("/mainstatus?name=" .. firstWaiting, "POST", {
                             status = "intrail",
                             caller = myName,
@@ -413,7 +413,7 @@ if myRole == "ally" then
                 else
                     if tick() - lastLog >= LOG_COOLDOWN then
                         lastLog = tick()
-                        addLog("FM ON | khong co Main waiting -> giu room", Color3.fromRGB(150, 200, 255))
+                        addLog("Moon active - no waiting primary, holding realm", Color3.fromRGB(150, 200, 255))
                     end
                 end
             until true
@@ -421,7 +421,7 @@ if myRole == "ally" then
         end)
 
     elseif myIndex == 2 then
-        addLog("[Help 2] Auto Follow Help1", Color3.fromRGB(100, 200, 255))
+        addLog("[Support-2] Following support lead", Color3.fromRGB(100, 200, 255))
 
         local lastFollowJob      = nil
         local lastFollowAt       = 0
@@ -435,18 +435,18 @@ if myRole == "ally" then
                 repeat
                 local help1_JobId = getJobId(getgenv().Config.Allies[1])
                 if not help1_JobId or help1_JobId == "" then
-                    if tick() - lastLog >= LOG_COOLDOWN then lastLog = tick() addLog("Khong tim thay Help1", Color3.fromRGB(255, 100, 100)) end
+                    if tick() - lastLog >= LOG_COOLDOWN then lastLog = tick() addLog("Lead support signal missing", Color3.fromRGB(255, 100, 100)) end
                     break
                 end
                 if help1_JobId == game.JobId then
-                    if tick() - lastLog >= LOG_COOLDOWN then lastLog = tick() addLog("Da cung server Help1", Color3.fromRGB(100, 255, 180)) end
+                    if tick() - lastLog >= LOG_COOLDOWN then lastLog = tick() addLog("Already paired with lead support", Color3.fromRGB(100, 255, 180)) end
                     break
                 end
                 if help1_JobId == lastFollowJob and help1_JobId ~= game.JobId and (tick() - lastFollowAt) < FOLLOW_COOLDOWN then break end
 
                 lastFollowJob = help1_JobId
                 lastFollowAt  = tick()
-                addLog("Theo Help1 -> " .. tostring(help1_JobId):sub(1, 8), Color3.fromRGB(255, 220, 0))
+                addLog("Following lead realm -> " .. tostring(help1_JobId):sub(1, 8), Color3.fromRGB(255, 220, 0))
                 hopServer(help1_JobId)
             until true
             end
@@ -455,34 +455,34 @@ if myRole == "ally" then
 
 -- ================= MAIN =================
 elseif myRole == "main" then
-    addLog("[Main] Khoi dong...", Color3.fromRGB(0, 255, 200))
+    addLog("[Primary] Online handshake started", Color3.fromRGB(0, 255, 200))
 
     repeat task.wait(1) until game.Players.LocalPlayer.Character
         and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     local initStatus, initDialog = "noV4", "unknown"
     pcall(function() initStatus, initDialog = getDialogStatus() end)
-    addLog("Dialog: " .. initStatus .. " | " .. initDialog:sub(1, 35), Color3.fromRGB(150, 200, 255))
+    addLog("Temple state: " .. initStatus .. " | " .. initDialog:sub(1, 35), Color3.fromRGB(150, 200, 255))
 
     local TRAIN_HOP_DONE = false
     local TRAIN_HOP_MAX  = 5
 
     local function hopOnceForTrain()
         if TRAIN_HOP_DONE then
-            addLog("Training: da hop 1 lan roi -> dung train", Color3.fromRGB(150, 150, 200))
+            addLog("Training shift already used - staying put", Color3.fromRGB(150, 150, 200))
             return
         end
         TRAIN_HOP_DONE = true
-        addLog("Training -> hop toi da " .. TRAIN_HOP_MAX .. " job 1 lan", Color3.fromRGB(255, 220, 0))
+        addLog("Training relocation burst: up to " .. TRAIN_HOP_MAX .. " realm(s) once", Color3.fromRGB(255, 220, 0))
         task.spawn(function() pcall(function() Hop(TRAIN_HOP_MAX) end) end)
     end
 
     if initStatus == "training" then
         TRAIN_HOP_DONE = true
-        addLog("Dang training -> dung train, khong hop lai", Color3.fromRGB(255, 150, 50))
+        addLog("Training detected - no extra relocation", Color3.fromRGB(255, 150, 50))
         setMyStatus("training")
     else
-        addLog("Set waiting cho Help1 goi vao", Color3.fromRGB(0, 255, 180))
+        addLog("Queued for moon call", Color3.fromRGB(0, 255, 180))
         setMyStatus("waiting")
     end
 
@@ -490,7 +490,7 @@ elseif myRole == "main" then
         while task.wait(1) do
             repeat
             if workspace:GetAttribute("MAP") and workspace:GetAttribute("MAP") ~= "Sea3" then
-                addLog("Khong o Sea3 -> dung cho", Color3.fromRGB(255, 100, 100))
+                addLog("Outside Sea 3 - standby", Color3.fromRGB(255, 100, 100))
                 task.wait(5); break
             end
 
@@ -504,53 +504,53 @@ elseif myRole == "main" then
 
             if myStatus == "intrail" then
                 if dialogStatus == "done" then
-                    addLog("Done race -> hop server moi", Color3.fromRGB(0, 255, 150))
+                    addLog("Evolution complete - relocating", Color3.fromRGB(0, 255, 150))
                     setMyStatus("done") task.wait(1)
                     pcall(function() Hop() end)
                 elseif dialogStatus == "training" then
-                    addLog("Trial xong -> set training", Color3.fromRGB(255, 220, 0))
+                    addLog("Trial cleared - training mode enabled", Color3.fromRGB(255, 220, 0))
                     setMyStatus("training")
                     TRAIN_HOP_DONE = false hopOnceForTrain()
                 else
                     local help1_JobId = getJobId(getgenv().Config.Allies[1])
                     if help1_JobId and help1_JobId ~= game.JobId then
-                        addLog("Bay sang Help1 (" .. dialogStatus .. ")", Color3.fromRGB(255, 220, 0))
+                        addLog("Moving to support lead (" .. dialogStatus .. ")", Color3.fromRGB(255, 220, 0))
                         hopServer(help1_JobId)
                     else
-                        addLog("Da o server Help1 / cho trial", Color3.fromRGB(150, 150, 150))
+                        addLog("With support lead - awaiting trial", Color3.fromRGB(150, 150, 150))
                     end
                 end
             elseif myStatus == "training" then
                 if dialogStatus == "training" then
-                    addLog("Dang training -> hop train", Color3.fromRGB(150, 150, 200))
+                    addLog("Training active - relocation check", Color3.fromRGB(150, 150, 200))
                     hopOnceForTrain()
                 elseif dialogStatus == "ready" then
-                    addLog("Training xong -> set waiting", Color3.fromRGB(0, 255, 180))
+                    addLog("Training complete - back to queue", Color3.fromRGB(0, 255, 180))
                     TRAIN_HOP_DONE = false setMyStatus("waiting")
                 elseif dialogStatus == "done" then
-                    addLog("Done race -> set done", Color3.fromRGB(0, 255, 150))
+                    addLog("Evolution complete - state saved", Color3.fromRGB(0, 255, 150))
                     setMyStatus("done")
                 else
-                    addLog("Training, dialog " .. dialogStatus .. " -> giu training", Color3.fromRGB(255, 180, 80))
+                    addLog("Training hold, temple " .. dialogStatus .. " -> maintain training", Color3.fromRGB(255, 180, 80))
                     hopOnceForTrain()
                 end
             elseif myStatus == "waiting" then
                 if dialogStatus == "training" then
-                    addLog("Phat hien can train -> set training", Color3.fromRGB(255, 150, 50))
+                    addLog("Training requirement detected", Color3.fromRGB(255, 150, 50))
                     setMyStatus("training")
                     TRAIN_HOP_DONE = false hopOnceForTrain()
                 elseif dialogStatus == "done" then
-                    addLog("Done race -> set done", Color3.fromRGB(0, 255, 150))
+                    addLog("Evolution complete - state saved", Color3.fromRGB(0, 255, 150))
                     setMyStatus("done")
                 else
                     if dialogStatus == "ready" then
-                        addLog("Ready for trial -> waiting, cho Help1 goi", Color3.fromRGB(0, 255, 180))
+                        addLog("Trial-ready - awaiting moon dispatch", Color3.fromRGB(0, 255, 180))
                     else
-                        addLog("Cho Help1 goi vao... (" .. dialogStatus .. ")", Color3.fromRGB(150, 200, 255))
+                        addLog("Standing by for support call (" .. dialogStatus .. ")", Color3.fromRGB(150, 200, 255))
                     end
                 end
             elseif myStatus == "done" then
-                addLog("Done - dung yen", Color3.fromRGB(0, 255, 150))
+                addLog("Complete - idle hold", Color3.fromRGB(0, 255, 150))
             end
         until true
         end
