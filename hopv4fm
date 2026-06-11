@@ -219,7 +219,7 @@ local function hopFullMoon()
     end)
     if success and result and result.success and result.data then
         for _, v in pairs(result.data) do
-            if v.jobid and v.jobid ~= game.JobId and v.player >= 8 and v.player < 12 then
+            if v.jobid and v.jobid ~= game.JobId and v.player >= 1 and v.player < 11 then
                 addLog("Full Moon found! Nhảy...", Color3.fromRGB(180, 100, 255))
                 hopServer(v.jobid)
                 return true
