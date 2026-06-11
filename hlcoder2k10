@@ -13,6 +13,35 @@ end
 local BASE_URL = "http://fi7.bot-hosting.net:20320"
 local myName = game.Players.LocalPlayer.Name
 
+-- ================= FAILED REALM BLACKLIST =================
+local hopFullMoon
+local FailedJobs = {}
+local CurrentTargetJob = nil
+local LastFailRetry = 0
+
+local function markBadJob(jobId)
+    if jobId then
+        FailedJobs[tostring(jobId)] = tick()
+    end
+end
+
+local function isBadJob(jobId)
+    jobId = tostring(jobId or "")
+    return FailedJobs[jobId] and (tick() - FailedJobs[jobId] < 300)
+end
+
+local function closeTeleportPopup()
+    pcall(function()
+        local pg = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+        if not pg then return end
+        for _, obj in ipairs(pg:GetDescendants()) do
+            if obj:IsA("TextButton") and (obj.Text == "Ok" or obj.Text == "OK" or obj.Text == "Close") then
+                pcall(function() firesignal(obj.MouseButton1Click) end)
+            end
+        end
+    end)
+end
+
 -- ================= CENTER LOG ONLY =================
 local TweenService_UI = game:GetService("TweenService")
 local screenGui = Instance.new("ScreenGui")
@@ -37,15 +66,16 @@ roleLabel.Parent = screenGui
 
 local logLabel = Instance.new("TextLabel")
 logLabel.Name = "CenterLogLabel"
-logLabel.Size = UDim2.new(0, 900, 0, 46)
-logLabel.Position = UDim2.new(0.5, -450, 0.39, 0)
+logLabel.Size = UDim2.new(0, 650, 0, 28)
+logLabel.Position = UDim2.new(0.5, -325, 0.39, 0)
 logLabel.BackgroundTransparency = 1
 logLabel.Text = ""
 logLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 logLabel.TextStrokeTransparency = 0
 logLabel.TextXAlignment = Enum.TextXAlignment.Center
 logLabel.Font = Enum.Font.GothamBold
-logLabel.TextScaled = true
+logLabel.TextScaled = false
+logLabel.TextSize = 20
 logLabel.Parent = screenGui
 
 local lastFadeId = 0
@@ -76,6 +106,24 @@ local function addLog(text, color)
         end)
     end)
 end
+
+-- ================= TELEPORT FAIL HANDLER =================
+local TeleportService = game:GetService("TeleportService")
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if CurrentTargetJob then
+        markBadJob(CurrentTargetJob)
+        addLog("Realm unavailable -> next target", Color3.fromRGB(255, 100, 100))
+        closeTeleportPopup()
+        if tick() - LastFailRetry >= 0.75 then
+            LastFailRetry = tick()
+            task.delay(0.25, function()
+                if hopFullMoon then
+                    pcall(hopFullMoon)
+                end
+            end)
+        end
+    end
+end)
 
 -- ================= WAIT GAME =================
 repeat wait(1)
@@ -163,13 +211,14 @@ local function setMyStatus(status)
 end
 
 local function hopServer(jobId)
-    if jobId and jobId ~= game.JobId then
-        addLog("Transferring realm: " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
+    if jobId and tostring(jobId) ~= tostring(game.JobId) and not isBadJob(jobId) then
+        CurrentTargetJob = tostring(jobId)
+        addLog("Transferring: " .. tostring(jobId):sub(1, 8), Color3.fromRGB(255, 220, 0))
         game:GetService("ReplicatedStorage"):WaitForChild("__ServerBrowser"):InvokeServer("teleport", jobId)
     end
 end
 
-local function hopFullMoon()
+hopFullMoon = function()
     local success, result = pcall(function()
         return game.HttpService:JSONDecode(
             game:HttpGet("http://mbasic7.pikamc.vn:25082/api/name=fullmoon?apikey=CONCACDUMAMAY")
@@ -206,7 +255,7 @@ local function hopFullMoon()
         local jobid = v.jobid or v.JobId or v.id
         local player = tonumber(v.player or v.players or v.Count or 99)
 
-        if jobid and tostring(jobid) ~= tostring(game.JobId) then
+        if jobid and tostring(jobid) ~= tostring(game.JobId) and not isBadJob(jobid) then
             if player <= maxPlayer then
                 addLog(
                     "Locking moon realm " .. tostring(player) .. "p | " .. tostring(jobid):sub(1, 8),
@@ -235,9 +284,10 @@ function Hop(maxHops)
         local success, servers = pcall(function() return ServerBrowser:InvokeServer(i) end)
         if success and servers then
             for jobId, info in pairs(servers) do
-                if jobId ~= game.JobId and info.Count < 12 then
+                if jobId ~= game.JobId and info.Count < 12 and not isBadJob(jobId) then
                     hopped = hopped + 1
                     addLog("Realm shift " .. hopped .. "/" .. maxHops .. ": " .. tostring(jobId):sub(1, 16) .. "...", Color3.fromRGB(255, 220, 0))
+                    CurrentTargetJob = tostring(jobId)
                     ServerBrowser:InvokeServer("teleport", jobId)
                     task.wait(0.25)
                     if hopped >= maxHops then
