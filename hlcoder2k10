@@ -239,21 +239,35 @@ local function hopFullMoon()
 
     addLog("FM API co " .. tostring(#list) .. " job", Color3.fromRGB(0, 255, 255))
 
+    -- Sort server it nguoi truoc de tranh full khi Ally2/Main join vao.
+    table.sort(list, function(a, b)
+        return tonumber(a.player or a.players or a.Count or 99) < tonumber(b.player or b.players or b.Count or 99)
+    end)
+
+    local maxPlayer = tonumber(getgenv().Config.FMMaxPlayer) or 7
+
     for _, v in pairs(list) do
         local jobid = v.jobid or v.JobId or v.id
-        local player = v.player or v.players or v.Count or "?"
+        local player = tonumber(v.player or v.players or v.Count or 99)
 
         if jobid and tostring(jobid) ~= tostring(game.JobId) then
-            addLog(
-                "TRY FM " .. tostring(player) .. "p | " .. tostring(jobid):sub(1, 8),
-                Color3.fromRGB(150, 255, 255)
-            )
-            hopServer(jobid)
-            return true
+            if player <= maxPlayer then
+                addLog(
+                    "TRY FM " .. tostring(player) .. "p | " .. tostring(jobid):sub(1, 8),
+                    Color3.fromRGB(150, 255, 255)
+                )
+                hopServer(jobid)
+                return true
+            else
+                addLog(
+                    "Skip FM full " .. tostring(player) .. "p | max " .. tostring(maxPlayer),
+                    Color3.fromRGB(255, 150, 50)
+                )
+            end
         end
     end
 
-    addLog("Khong co FM job hop le", Color3.fromRGB(255, 80, 80))
+    addLog("Khong co FM job du slot <= " .. tostring(maxPlayer), Color3.fromRGB(255, 80, 80))
     return false
 end
 
